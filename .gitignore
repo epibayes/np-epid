@@ -1,0 +1,4 @@
+notebooks/
+pyproject.toml
+__pycache__
+data.md
