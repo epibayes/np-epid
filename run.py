@@ -18,8 +18,7 @@ def main():
         np.random.normal(scale=3, size=8)
     )
 
-    simulator = CRKPTransmissionSimulator
-    return
+    simulator._simulate()
 
 if __name__ == "__main__":
     main()
