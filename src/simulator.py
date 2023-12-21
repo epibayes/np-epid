@@ -2,14 +2,14 @@ import pandas as pd
 import numpy as np
 
 class CRKPTransmissionSimulator:
-    def __init__(self, path, beta):
+    def __init__(self, path, sigma):
         self.path = path
         self.fac_tr = None
         self.floor_tr = None
         self.room_tr = None
         self.known = None
-        self.beta = beta
-        self.T = self.fac_tr.shape[1]
+        self.T = None
+        self.sigma = sigma
 
     def load_data(self):
         # traces
@@ -30,6 +30,7 @@ class CRKPTransmissionSimulator:
             )
         # known events
         self.known = self.load_known()
+        self.T = self.fac_tr.shape[1]
 
     def load_known(self):
         # specify fixed points of the simulation
@@ -66,10 +67,15 @@ class CRKPTransmissionSimulator:
         simulations = []
         # TODO: move generating beta to here?
         for _ in range(N):
+            # generate beta
+            # lognormal prior
+            beta = np.exp(
+                np.random.normal(scale=self.sigma, size=8)
+            )
             # can try to calculate summary statistics, here
-            simulations.append(self.simulate())
+            simulations.append(self.simulate(beta))
 
-    def _simulate(self):
+    def _simulate(self, beta):
         transmission_status = pd.DataFrame(index=self.known.index, columns=range(self.T))
         # TODO: do i want to hard code week 0?
         transmission_status[0] = self.known[0]
