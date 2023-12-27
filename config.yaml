@@ -1,1 +1,31 @@
-path: "Volumes/umms-esnitkin/Project_KPC_LTACH/Analysis/LTACH_transmission_modeling/data"
+experiment: toy-exponential
+
+
+toy-exponential:
+  theta_true: 10
+  random_state: 4
+  n_sample: 128
+  n_obs: 500
+  summary: True
+  # prior
+  shape: 2
+  scale: 2
+
+crkp:
+  path: "Volumes/umms-esnitkin/Project_KPC_LTACH/Analysis/LTACH_transmission_modeling/data"
+
+train:
+  train_frac: 0.7
+  batch_size: 16
+  # random seed for train-validation split
+  seed: 29
+  max_epochs: 20
+  log_freq: 4
+
+model:
+  d_model: 20
+  lr: 0.001
+
+hydra:
+  job:
+    chdir: True

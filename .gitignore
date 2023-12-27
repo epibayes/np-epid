@@ -1,3 +1,5 @@
 pyproject.toml
 __pycache__
 data.md
+outputs
+lightning_logs
