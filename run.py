@@ -1,11 +1,9 @@
 import hydra
-
-import numpy as np
-import pandas as pd
 import lightning as L
-
 from lightning.pytorch.loggers import WandbLogger
-from src.dataset import ExponentialToyDataset
+from hydra.utils import instantiate
+
+# from src.dataset import ExponentialToyDataset
 from src.utils import DataModule
 from src.model import GaussianDensityNetwork
 
@@ -13,11 +11,9 @@ from src.model import GaussianDensityNetwork
 def main(cfg=None):
     data_cfg = cfg[cfg.experiment]
     # todo: switch over to instantiate
-    if cfg.experiment == "toy-exponential":
-        dataset = ExponentialToyDataset(
-            data_cfg.n_obs, data_cfg.n_sample, data_cfg.shape, data_cfg.scale,
-            data_cfg.random_state
-        )
+    dataset = instantiate(data_cfg)
+    observed_data = dataset.get_observed_data()
+
 
     datamodule = DataModule(
         dataset, cfg.train.seed, cfg.train.batch_size, cfg.train.train_frac
@@ -33,8 +29,8 @@ def main(cfg=None):
 
     trainer.fit(model, datamodule=datamodule)
 
-    # predict step?
-    # generate/load "true" data & feed it through the trained nn
+    mu, sigma = model.predict_step(observed_data)
+    dataset.evaluate(mu, sigma)
 
 
 

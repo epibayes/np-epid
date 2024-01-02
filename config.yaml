@@ -1,7 +1,13 @@
-experiment: toy-exponential
+experiment: test-dataset
+
+test-dataset:
+  _target_: src.dataset.TestDataset
+  n_sample: 256
+  random_state: 6
 
 
 toy-exponential:
+  _target_: src.dataset.ExponentialToyDataset
   theta_true: 10
   random_state: 4
   n_sample: 128
@@ -19,7 +25,7 @@ train:
   batch_size: 16
   # random seed for train-validation split
   seed: 29
-  max_epochs: 20
+  max_epochs: 10
   log_freq: 4
 
 model:

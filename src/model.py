@@ -27,6 +27,7 @@ class GaussianDensityNetwork(L.LightningModule):
 
     def forward(self, x):
         if len(x.shape) == 1:
+            # TODO: fix this
             # coerce 1d inputs to matrix form
             x = x.unsqueeze(1)
         y = self.ff(x)
@@ -35,6 +36,7 @@ class GaussianDensityNetwork(L.LightningModule):
         return mu, sigma
     
     def training_step(self, batch, batch_idx):
+        # consider renaming theta to z
         x, theta = batch
         mu, sigma = self(x)
         loss = self.gaussiannll(theta, mu, sigma)
@@ -60,6 +62,11 @@ class GaussianDensityNetwork(L.LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.AdamW(self.parameters(), lr=self.lr)
+    
+
+    def predict_step(self, x):
+        mu, sigma = self(x)
+        return mu, sigma
         
 
 
