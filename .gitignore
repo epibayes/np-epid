@@ -4,3 +4,4 @@ data.md
 outputs
 lightning_logs
 .vscode
+.DS_Store
