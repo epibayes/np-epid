@@ -100,7 +100,7 @@ class CRKPTransmissionSimulator:
                 hazard_j += status[(status == 1) & (room == room_num)].count() \
                     * self.beta[-1]
 
-                p_j = 1 - np.exp(hazard_j)
+                p_j = 1 - np.exp(-hazard_j)
 
                 Y_j = np.random.binomial(1, p_j)
                 transmission_status.loc[j, t] = Y_j
