@@ -51,12 +51,19 @@ class GaussianDensityNetwork(L.LightningModule):
         self.log("val_loss", loss)
         return loss
 
-    def gaussiannll(self, x, mu, sigma):
-        if self.n_mu == 1:
-            p = Normal(mu, sigma)
-            l = - p.log_prob(x)
+    def gaussiannll(self, theta, mu, sigma):
+        p = self.n_mu
+        if p == 1:
+            normal = Normal(mu, sigma)
+            l = - normal.log_prob(theta)
         else:
-            raise NotImplementedError
+            b = theta.shape[0]
+            L = torch.zeros(b, p, p)
+            tril_ix = torch.tril_indices(p, p)
+            L[:, tril_ix[0], tril_ix[1]] = sigma
+            mvn = MultivariateNormal(loc=mu, scale_tril=L)
+            l = - mvn.log_prob(theta)
+
         return l.mean()
     
 

@@ -1,21 +1,18 @@
-experiment: test-dataset
+experiment: bayes-linreg
 
 test-dataset:
   _target_: src.dataset.TestDataset
   n_sample: 256
   random_state: 6
 
+bayes-linreg:
+  _target_: src.dataset.BayesLinRegDataset
+  n_obs: 10
+  n_sample: 256
+  random_state: 5
+  shrinkage: 1
+  sigma: 1
 
-toy-exponential:
-  _target_: src.dataset.ExponentialToyDataset
-  theta_true: 10
-  random_state: 4
-  n_sample: 128
-  n_obs: 500
-  summary: True
-  # prior
-  shape: 2
-  scale: 2
 
 crkp:
   path: "Volumes/umms-esnitkin/Project_KPC_LTACH/Analysis/LTACH_transmission_modeling/data"
@@ -35,3 +32,15 @@ model:
 hydra:
   job:
     chdir: True
+
+
+# toy-exponential:
+#   _target_: src.dataset.ExponentialToyDataset
+#   theta_true: 10
+#   random_state: 4
+#   n_sample: 128
+#   n_obs: 500
+#   summary: True
+#   # prior
+#   shape: 2
+#   scale: 2
