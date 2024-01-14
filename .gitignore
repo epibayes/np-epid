@@ -1,4 +1,4 @@
-pyproject.toml
+poetry.lock
 __pycache__
 data.md
 outputs
