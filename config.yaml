@@ -1,4 +1,4 @@
-experiment: normal-normal
+experiment: test-dataset
 
 test-dataset:
   _target_: src.dataset.TestDataset
@@ -11,7 +11,7 @@ normal-normal:
   n_obs: 10
   random_state: 5
   shrinkage: 1
-  sigma: 1
+  noise: 1
   dimension: 1
 
 bayes-linreg:
@@ -20,7 +20,7 @@ bayes-linreg:
   n_sample: 256
   random_state: 5
   shrinkage: 1
-  sigma: 1
+  noise: 1
 
 
 crkp:
@@ -28,7 +28,7 @@ crkp:
 
 train:
   train_frac: 0.7
-  batch_size: 16
+  batch_size: 4
   # random seed for train-validation split
   seed: 29
   max_epochs: 10

@@ -25,4 +25,4 @@ class DataModule(L.LightningDataModule):
         return DataLoader(self.train, self.batch_size, shuffle=True)
     
     def val_dataloader(self):
-        return DataLoader(self.val, 2 * self.batch_size)
+        return DataLoader(self.val, self.batch_size)

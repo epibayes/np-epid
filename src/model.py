@@ -27,9 +27,7 @@ class GaussianDensityNetwork(L.LightningModule):
 
     def forward(self, x):
         if len(x.shape) == 1:
-            # TODO: fix this
-            # coerce 1d inputs to matrix form
-            x = x.unsqueeze(1)
+            x = x.unsqueeze(0)
         y = self.ff(x)
         mu = y[:, :self.n_mu]
         sigma = torch.exp(y[:, self.n_mu:])
