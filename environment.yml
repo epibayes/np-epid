@@ -1,0 +1,7 @@
+name: research
+channels:
+  - conda-forge
+dependencies:
+  - pytorch
+  - conda-forge::poetry
+  - lightning
