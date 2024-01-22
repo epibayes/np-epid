@@ -30,7 +30,7 @@ def main(cfg=None):
     trainer.fit(model, datamodule=datamodule)
 
     mu, sigma = model.predict_step(observed_data)
-    dataset.evaluate(mu, sigma)
+    dataset.evaluate(mu, sigma, observed_data)
 
 
 

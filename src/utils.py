@@ -26,3 +26,14 @@ class DataModule(L.LightningDataModule):
     
     def val_dataloader(self):
         return DataLoader(self.val, self.batch_size)
+    
+def lower_tri(values, dim):
+    if values.shape[0] > 1:
+        L = torch.zeros(values.shape[0], dim, dim, device=values.device)
+        tril_ix = torch.tril_indices(dim, dim)
+        L[:, tril_ix[0], tril_ix[1]] = values
+    else:
+        L = torch.zeros(dim, dim, device=values.device)
+        tril_ix = torch.tril_indices(dim, dim)
+        L[tril_ix[0], tril_ix[1]] = values[0]
+    return L

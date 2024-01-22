@@ -4,15 +4,17 @@ from torch.nn import Linear
 from torch.distributions.normal import Normal
 from torch.distributions.multivariate_normal import MultivariateNormal
 
+from src.utils import lower_tri
+
 
 class GaussianDensityNetwork(L.LightningModule):
     def __init__(self, d_x, d_theta, d_model, lr):
         super().__init__()
 
         # compute number of outputs
-        self.n_mu = d_theta
-        self.n_sigma = d_theta + d_theta * (d_theta - 1) // 2
-        n_outputs = self.n_mu + self.n_sigma
+        self.dim = d_theta
+        n_sigma = d_theta + d_theta * (d_theta - 1) // 2
+        n_outputs = self.dim + n_sigma
 
         self.ff = torch.nn.Sequential(
             Linear(d_x, d_model),
@@ -26,15 +28,15 @@ class GaussianDensityNetwork(L.LightningModule):
         self.lr = lr
 
     def forward(self, x):
+        #TODO: fix this
         if len(x.shape) == 1:
-            x = x.unsqueeze(0)
+            x = x.unsqueeze(1)
         y = self.ff(x)
-        mu = y[:, :self.n_mu]
-        sigma = torch.exp(y[:, self.n_mu:])
+        mu = y[:, :self.dim]
+        sigma = torch.exp(y[:, self.dim:])
         return mu, sigma
     
     def training_step(self, batch, batch_idx):
-        # consider renaming theta to z
         x, theta = batch
         mu, sigma = self(x)
         loss = self.gaussiannll(theta, mu, sigma)
@@ -50,15 +52,12 @@ class GaussianDensityNetwork(L.LightningModule):
         return loss
 
     def gaussiannll(self, theta, mu, sigma):
-        p = self.n_mu
+        p = self.dim
         if p == 1:
             normal = Normal(mu, sigma)
-            l = - normal.log_prob(theta)
+            l = - normal.log_prob(theta).diag()
         else:
-            b = theta.shape[0]
-            L = torch.zeros(b, p, p)
-            tril_ix = torch.tril_indices(p, p)
-            L[:, tril_ix[0], tril_ix[1]] = sigma
+            L = lower_tri(sigma, p)
             mvn = MultivariateNormal(loc=mu, scale_tril=L)
             l = - mvn.log_prob(theta)
 
