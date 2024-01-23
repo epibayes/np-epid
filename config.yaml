@@ -10,8 +10,8 @@ normal-normal:
   n_sample: 256
   n_obs: 10
   random_state: 5
-  shrinkage: 1
-  noise: 1
+  shrinkage: 1.
+  noise: 1.
   dimension: 1
 
 bayes-linreg:
@@ -19,8 +19,9 @@ bayes-linreg:
   n_obs: 10
   n_sample: 256
   random_state: 5
-  shrinkage: 1
-  noise: 1
+  shrinkage: 1.
+  noise: 1.
+  dimension: 1
 
 
 crkp:
@@ -28,7 +29,7 @@ crkp:
 
 train:
   train_frac: 0.7
-  batch_size: 4
+  batch_size: 8
   # random seed for train-validation split
   seed: 29
   max_epochs: 10

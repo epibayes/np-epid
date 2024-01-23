@@ -5,6 +5,8 @@ from torch.distributions import MultivariateNormal, Normal
 
 from src.utils import lower_tri
 
+COEFFS = torch.tensor([1.45, 1.79, 0.49])
+
 class TestDataset(Dataset):
     # can the density network learn a simple gaussian?
     def __init__(self, n_sample, random_state):
@@ -43,12 +45,11 @@ class NormalNormalDataset(Dataset):
             raise ValueError("Test case designed for dimensions < 4")
         self.n_obs = n_obs # something small, like 10 i think
         self.n_sample = n_sample
-        self.shrinkage = shrinkage # l2 penalty--smaller shrinks more
-        self.noise = noise
+        self.shrinkage = shrinkage # l2 penalty: *std* of prior
+        self.noise = noise # *std* of observational error
         self.d_theta = dimension
         self.d_x = dimension
-        THETA_TRUE = torch.tensor([1.45, 1.79, 0.49])
-        self.theta_true = THETA_TRUE[:dimension]
+        self.theta_true = COEFFS[:dimension]
 
         self.x, self.theta = self.simulate_data(random_state)
 
@@ -64,7 +65,7 @@ class NormalNormalDataset(Dataset):
         torch.manual_seed(random_state)
         p = self.d_theta
         mu_0 = torch.zeros(p)
-        Sigma_0 = self.shrinkage * torch.eye(p)
+        Sigma_0 = self.shrinkage**2 * torch.eye(p)
         mus =  torch.tensor(
             np.random.multivariate_normal(mu_0, Sigma_0, size=self.n_sample)
         ).float()
@@ -86,7 +87,7 @@ class NormalNormalDataset(Dataset):
         p = self.d_theta
         if p == 1:
             x_o = torch.normal(
-                self.theta_true, self.noise, (self.n_obs,)
+                self.theta_true.item(), self.noise, (self.n_obs,)
             ).sum()
         else:
             ll_true = MultivariateNormal(self.theta_true, self.noise *torch.eye(p))
@@ -101,9 +102,9 @@ class NormalNormalDataset(Dataset):
             print(f"mu error: {mu_error.item():.3f}")
             print(f"sigma error: {sigma_error.item():.3f}")
         else:
-            # TODO: convert "sigma" from lower tri to cov matrix
             for i in range(self.d_theta):
                 print(f"Component {i+1} mu error: {mu_error[0, i].item():.3f}")
+                # can probably replace this with overall MSE
             L = lower_tri(sigma, self.d_theta)
             cov_est = L @ L.T
             cov_true = exact_sigma * torch.eye(self.d_theta)
@@ -112,7 +113,7 @@ class NormalNormalDataset(Dataset):
 
     def posterior_mean(self, x_o):
         # sanity check this for MVN
-        s02 = self.shrinkage
+        s02 = self.shrinkage ** 2
         s2 = self.noise
         n = self.n_obs
         sigma = 1 / ((1 / s02) + (n / s2))
@@ -122,15 +123,16 @@ class NormalNormalDataset(Dataset):
 
 
 class BayesLinRegDataset(Dataset):
-    def __init__(self, n_obs, n_sample, random_state, shrinkage, noise):
+    def __init__(self, n_obs, n_sample, random_state, shrinkage, noise, dimension):
+        if dimension > 3:
+            raise ValueError("Test case designed for dimensions < 4")
         self.n_obs = n_obs # something small, like 10 i think
         self.n_sample = n_sample
         self.shrinkage = shrinkage # l2 penalty--smaller shrinks more
         self.noise = noise
-        # may want to generalize this to a higher dim regression
-        self.d_theta = 2
-        self.d_x = n_obs
-        self.theta_true = np.array([1.6, -.9])
+        self.d_theta = dimension
+        self.d_x = dimension * (dimension + 1)
+        self.theta_true = COEFFS[:dimension]
 
         self.data, self.theta = self.simulate_data(random_state)
 
@@ -145,23 +147,39 @@ class BayesLinRegDataset(Dataset):
         torch.manual_seed(random_state)
         p = self.d_theta
         m_0 = torch.zeros(p)
-        S_0 = self.shrinkage * torch.eye(3)
+        S_0 = self.shrinkage**2 * torch.eye(p)
         betas = np.random.multivariate_normal(m_0, S_0, size=self.n_sample)
         X = np.random.uniform(low = -5, high=5, size=(self.n_obs, p))
         ys = torch.normal(torch.tensor(betas @ X.T), self.noise)
-        # TODO: combine ys and xs
-        return ys.float(), torch.tensor(betas).float()
+        xtx = torch.tensor(np.tile((X.T @ X).flatten(), (self.n_sample, 1)))
+        xty = ys @ X # (n_samples, p)
+        data = torch.cat((xtx, xty), 1) # (n_samples, p(p+1))
+        return data.float(), torch.tensor(betas).float()
     
-    def evaluate(self, mu, sigma, y_o):
-        raise NotImplementedError
-        # mu_mse = (mu ** 2).mean().item()
-        # sigma_mse = ((sigma - 1)**2).mean().item()
-        # print(f"mu, MSE: {mu_mse:.3f}")
-        # print(f"sigma, MSE: {sigma_mse:.3f}")
-    
-    def posterior_mean(self, xy_0):
-        # how to disaggregate x and y?
-        pass
+    def evaluate(self, mu, sigma, data_o):
+        data_o = data_o[0]
+        xtx_o = data_o[:-self.d_theta]
+        xty_o = data_o[-self.d_theta:]
+        exact_mu, exact_sigma = self.posterior_mean(xtx_o, xty_o)
+        mu_error = (mu - exact_mu)**2
+        sigma_error = (sigma - exact_sigma)**2
+        if self.d_theta == 1:
+            print(f"mu error: {mu_error.item():.3f}")
+            print(f"sigma error: {sigma_error.item():.3f}")
+        else:
+            raise NotImplementedError
+        
+        
+    def posterior_mean(self, xtx_o, xty_o):
+        # prior covariance
+        S_0 = self.shrinkage**2 * torch.eye(self.d_theta)
+        # likelihood variance
+        sigma2 = self.noise**2
+        # posterior covariance
+        S_N = torch.linalg.inv(xtx_o / sigma2 + torch.linalg.inv(S_0))
+        # posterior mean
+        m_N = S_N @ (xty_o / sigma2)
+        return m_N, S_N
     
     def get_observed_data(self):
         np.random.seed(4)
@@ -170,7 +188,9 @@ class BayesLinRegDataset(Dataset):
         y_o = torch.normal(
             torch.tensor((self.theta_true @ X.T)), self.noise
         )
-        return y_o
+        xtx = torch.tensor((X.T @ X).flatten())
+        xty = (y_o @ X)
+        return torch.cat((xtx, xty)).unsqueeze(0).float()
     
         
 

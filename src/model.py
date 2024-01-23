@@ -28,8 +28,8 @@ class GaussianDensityNetwork(L.LightningModule):
         self.lr = lr
 
     def forward(self, x):
-        #TODO: fix this
         if len(x.shape) == 1:
+            # assumes batch of 1-d inputs is being passed
             x = x.unsqueeze(1)
         y = self.ff(x)
         mu = y[:, :self.dim]
@@ -45,6 +45,8 @@ class GaussianDensityNetwork(L.LightningModule):
 
     
     def validation_step(self, batch, batch_idx):
+        # TODO: might be helpful to log how the estimated posterior evolves over time
+        # would entail passing in the "observed" data though
         x, theta = batch
         mu, sigma = self(x)
         loss = self.gaussiannll(theta, mu, sigma)
@@ -71,7 +73,3 @@ class GaussianDensityNetwork(L.LightningModule):
     def predict_step(self, x):
         mu, sigma = self(x)
         return mu, sigma
-        
-
-
-# TODO: multiple components (mixture density network)
