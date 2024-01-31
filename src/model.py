@@ -1,6 +1,6 @@
 import lightning as L
 import torch
-from torch.nn import Linear
+from torch.nn import Linear, Dropout, ReLU
 from torch.distributions.normal import Normal
 from torch.distributions.multivariate_normal import MultivariateNormal
 
@@ -8,7 +8,7 @@ from src.utils import lower_tri
 
 
 class GaussianDensityNetwork(L.LightningModule):
-    def __init__(self, d_x, d_theta, d_model, lr):
+    def __init__(self, d_x, d_theta, d_model, dropout, lr):
         super().__init__()
 
         # compute number of outputs
@@ -18,10 +18,11 @@ class GaussianDensityNetwork(L.LightningModule):
 
         self.ff = torch.nn.Sequential(
             Linear(d_x, d_model),
-            # dropout?
-            torch.nn.ReLU(),
+            Dropout(dropout), ReLU(),
             Linear(d_model, d_model),
-            torch.nn.ReLU(),
+            Dropout(dropout), ReLU(),
+            Linear(d_model, d_model),
+            Dropout(dropout), ReLU(),
             Linear(d_model, n_outputs),
         )
         # eventually need to save this as an hparam if i am checkpointing models
@@ -48,6 +49,7 @@ class GaussianDensityNetwork(L.LightningModule):
         # TODO: might be helpful to log how the estimated posterior evolves over time
         # would entail passing in the "observed" data though
         x, theta = batch
+        assert len(theta.shape) > 1
         mu, sigma = self(x)
         loss = self.gaussiannll(theta, mu, sigma)
         self.log("val_loss", loss)
@@ -57,7 +59,7 @@ class GaussianDensityNetwork(L.LightningModule):
         p = self.dim
         if p == 1:
             normal = Normal(mu, sigma)
-            l = - normal.log_prob(theta).diag()
+            l = - normal.log_prob(theta)
         else:
             L = lower_tri(sigma, p)
             mvn = MultivariateNormal(loc=mu, scale_tril=L)
@@ -67,6 +69,7 @@ class GaussianDensityNetwork(L.LightningModule):
     
 
     def configure_optimizers(self):
+        # TODO: consider swapping out for SGD with 
         return torch.optim.AdamW(self.parameters(), lr=self.lr)
     
 

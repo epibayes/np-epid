@@ -80,7 +80,7 @@ class NormalNormalDataset(Dataset):
             cov = self.noise * torch.eye(p)
             likelihood = MultivariateNormal(mus, cov)
             xs = likelihood.rsample((self.n_obs,)).sum(0)
-        return xs.float(), mus.float()
+        return xs.float(), mus.unsqueeze(1).float()
     
     def get_observed_data(self):
         torch.manual_seed(4)
@@ -96,15 +96,12 @@ class NormalNormalDataset(Dataset):
     
     def evaluate(self, mu, sigma, x_o):
         exact_mu, exact_sigma = self.posterior_mean(x_o)
-        mu_error = (mu - exact_mu)**2
-        sigma_error = (sigma - exact_sigma)**2
         if self.d_theta == 1:
-            print(f"mu error: {mu_error.item():.3f}")
-            print(f"sigma error: {sigma_error.item():.3f}")
+            print(f"Approximate posterior: B ~ N({mu.item():.3f}, {sigma.item():.3f})")
+            print(f"Exact posterior: B ~ N({exact_mu.item():.3f}, {exact_sigma:.3f})")
         else:
-            for i in range(self.d_theta):
-                print(f"Component {i+1} mu error: {mu_error[0, i].item():.3f}")
-                # can probably replace this with overall MSE
+            mu_error = (mu - exact_mu)**2
+            print(f"Average mu error: {mu_error.mean().item():.3f}")
             L = lower_tri(sigma, self.d_theta)
             cov_est = L @ L.T
             cov_true = exact_sigma * torch.eye(self.d_theta)
@@ -161,11 +158,9 @@ class BayesLinRegDataset(Dataset):
         xtx_o = data_o[:-self.d_theta]
         xty_o = data_o[-self.d_theta:]
         exact_mu, exact_sigma = self.posterior_mean(xtx_o, xty_o)
-        mu_error = (mu - exact_mu)**2
-        sigma_error = (sigma - exact_sigma)**2
         if self.d_theta == 1:
-            print(f"mu error: {mu_error.item():.3f}")
-            print(f"sigma error: {sigma_error.item():.3f}")
+            print(f"Approximate posterior: B ~ N({mu.item():.3f}, {sigma.item():.3f})")
+            print(f"Exact posterior: B ~ N({exact_mu.item():.3f}, {exact_sigma.item():.3f})")
         else:
             raise NotImplementedError
         
@@ -186,7 +181,8 @@ class BayesLinRegDataset(Dataset):
         torch.manual_seed(4)
         X = np.random.uniform(low = -5, high=5, size=(self.n_obs, self.d_theta))
         y_o = torch.normal(
-            torch.tensor((self.theta_true @ X.T)), self.noise
+            torch.tensor((self.theta_true @ X.T)).clone().detach(),
+              self.noise
         )
         xtx = torch.tensor((X.T @ X).flatten())
         xty = (y_o @ X)
