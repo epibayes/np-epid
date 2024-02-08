@@ -29,9 +29,9 @@ class GaussianDensityNetwork(L.LightningModule):
         self.lr = lr
 
     def forward(self, x):
-        if len(x.shape) == 1:
-            # assumes batch of 1-d inputs is being passed
-            x = x.unsqueeze(1)
+        assert len(x.shape) == 2
+        # assumes shape (n_batches, d_x)
+        # d_x could be 
         y = self.ff(x)
         mu = y[:, :self.dim]
         sigma = torch.exp(y[:, self.dim:])

@@ -1,27 +1,42 @@
-experiment: test-dataset
+experiment: si-model
+
+simulator: &simulator
+  n_sample: 256
+  random_state: 5
+
 
 test-dataset:
   _target_: src.dataset.TestDataset
-  n_sample: 256
-  random_state: 5
+  <<: *simulator
 
 normal-normal:
   _target_: src.dataset.NormalNormalDataset
-  n_sample: 256
+  <<: *simulator
   n_obs: 10
-  random_state: 5
   shrinkage: 1.
   noise: 1.
   dimension: 1
 
 bayes-linreg:
   _target_: src.dataset.BayesLinRegDataset
+  <<: *simulator
   n_obs: 10
-  n_sample: 256
-  random_state: 5
   shrinkage: 1.
   noise: 1.
   dimension: 1
+
+si-model:
+  _target_: src.dataset.SIModel
+  <<: *simulator
+  alpha: 0.1 #baseline proportion infected 
+  gamma: 0.05 # discharge rate
+  beta_true: 0.15 # true infection rate
+  prior_mu: -2
+  prior_sigma: 0.5
+  n_zones: 1
+  N: 100 # num patients
+  T: 52 # num timesteps
+
 
 
 crkp:

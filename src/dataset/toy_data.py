@@ -1,35 +1,29 @@
 import torch
 import numpy as np
-from torch.utils.data import Dataset
 from torch.distributions import MultivariateNormal, Normal
 
-from src.utils import lower_tri
+from src.utils import lower_tri, Simulator
 
 COEFFS = torch.tensor([1.45, 1.79, 0.49])
 
-class TestDataset(Dataset):
+class TestDataset(Simulator):
     # can the density network learn a simple gaussian?
     def __init__(self, n_sample, random_state):
         self.n_sample = n_sample
-        self.x, self.theta = self.simulate_data(random_state)
         self.d_x = 5
         self.d_theta = 1
+        self.data, self.theta = self.simulate_data(random_state)
 
-    def __len__(self):
-        return self.n_sample
-
-    def __getitem__(self, index):
-        return self.x[index], self.theta[index]
     
     def simulate_data(self, random_state):
         torch.manual_seed(random_state)
         theta = torch.normal(1, 1, (self.n_sample,))
         x = torch.normal(0, 3, (self.n_sample, 5))
-        return x, theta
+        return x, theta.unsqueeze(1)
     
     def get_observed_data(self):
         torch.manual_seed(4)
-        return torch.normal(0,1, size=(5,))
+        return torch.normal(0,1, size=(1, 5))
     
     def evaluate(self, mu, sigma, observed_data):
         mu_mse = ((mu - 1) ** 2).mean().item()
@@ -39,25 +33,20 @@ class TestDataset(Dataset):
 
 
 
-class NormalNormalDataset(Dataset):
+class NormalNormalDataset(Simulator):
     def __init__(self, n_obs, n_sample, random_state, shrinkage, noise, dimension):
         if dimension > 3:
             raise ValueError("Test case designed for dimensions < 4")
-        self.n_obs = n_obs # something small, like 10 i think
         self.n_sample = n_sample
+        self.n_obs = n_obs # something small, like 10 i think
         self.shrinkage = shrinkage # l2 penalty: *std* of prior
         self.noise = noise # *std* of observational error
         self.d_theta = dimension
         self.d_x = dimension
         self.theta_true = COEFFS[:dimension]
 
-        self.x, self.theta = self.simulate_data(random_state)
+        self.data, self.theta = self.simulate_data(random_state)
 
-    def __len__(self):
-        return self.n_sample
-
-    def __getitem__(self, index):
-        return self.x[index], self.theta[index]
     
 
     def simulate_data(self, random_state):
@@ -75,12 +64,13 @@ class NormalNormalDataset(Dataset):
                 mus,
                 torch.tensor(self.noise).repeat_interleave(self.n_sample)
                 )
-            xs = likelihood.rsample((self.n_obs,)).sum(0)
+            xs = likelihood.rsample((self.n_obs,)).sum(0).unsqueeze(1)
+            mus = mus.unsqueeze(1)
         else:
             cov = self.noise * torch.eye(p)
             likelihood = MultivariateNormal(mus, cov)
             xs = likelihood.rsample((self.n_obs,)).sum(0)
-        return xs.float(), mus.unsqueeze(1).float()
+        return xs.float(), mus.float()
     
     def get_observed_data(self):
         torch.manual_seed(4)
@@ -88,7 +78,7 @@ class NormalNormalDataset(Dataset):
         if p == 1:
             x_o = torch.normal(
                 self.theta_true.item(), self.noise, (self.n_obs,)
-            ).sum()
+            ).sum().unsqueeze(0)
         else:
             ll_true = MultivariateNormal(self.theta_true, self.noise *torch.eye(p))
             x_o = ll_true.rsample((self.n_obs,)).sum(0)
@@ -119,12 +109,12 @@ class NormalNormalDataset(Dataset):
 
 
 
-class BayesLinRegDataset(Dataset):
+class BayesLinRegDataset(Simulator):
     def __init__(self, n_obs, n_sample, random_state, shrinkage, noise, dimension):
         if dimension > 3:
             raise ValueError("Test case designed for dimensions < 4")
-        self.n_obs = n_obs # something small, like 10 i think
         self.n_sample = n_sample
+        self.n_obs = n_obs # something small, like 10 i think
         self.shrinkage = shrinkage # l2 penalty--smaller shrinks more
         self.noise = noise
         self.d_theta = dimension
@@ -133,12 +123,6 @@ class BayesLinRegDataset(Dataset):
 
         self.data, self.theta = self.simulate_data(random_state)
 
-    def __len__(self):
-        return self.n_sample
-
-    def __getitem__(self, index):
-        return self.data[index], self.theta[index]
-    
     def simulate_data(self, random_state):
         np.random.seed(random_state)
         torch.manual_seed(random_state)
@@ -162,16 +146,20 @@ class BayesLinRegDataset(Dataset):
             print(f"Approximate posterior: B ~ N({mu.item():.3f}, {sigma.item():.3f})")
             print(f"Exact posterior: B ~ N({exact_mu.item():.3f}, {exact_sigma.item():.3f})")
         else:
-            raise NotImplementedError
+            pass
+        # TODO: figure out how to evaluate multidim case
         
         
     def posterior_mean(self, xtx_o, xty_o):
+        p = self.d_theta
         # prior covariance
-        S_0 = self.shrinkage**2 * torch.eye(self.d_theta)
+        S_0 = self.shrinkage**2 * torch.eye(p)
         # likelihood variance
         sigma2 = self.noise**2
         # posterior covariance
-        S_N = torch.linalg.inv(xtx_o / sigma2 + torch.linalg.inv(S_0))
+
+        S_N = torch.linalg.inv(xtx_o.unflatten(0, (p, p)) / sigma2 +\
+                                torch.linalg.inv(S_0))
         # posterior mean
         m_N = S_N @ (xty_o / sigma2)
         return m_N, S_N

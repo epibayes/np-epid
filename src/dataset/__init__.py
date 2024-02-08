@@ -1,2 +1,2 @@
 from .toy_data import *
-from .sis_simulator import SIS_Simulator
+from .si_model import SIModel
