@@ -2,7 +2,8 @@ import torch
 import numpy as np
 from torch.distributions import MultivariateNormal, Normal
 
-from src.utils import lower_tri, Simulator
+from src.utils import lower_tri
+from .simulator import Simulator
 
 COEFFS = torch.tensor([1.45, 1.79, 0.49])
 
@@ -12,17 +13,19 @@ class TestDataset(Simulator):
         self.n_sample = n_sample
         self.d_x = 5
         self.d_theta = 1
-        self.data, self.theta = self.simulate_data(random_state)
+        self.random_state = random_state
+        self.data, self.theta = self.simulate_data()
+
 
     
-    def simulate_data(self, random_state):
-        torch.manual_seed(random_state)
+    def simulate_data(self):
+        torch.manual_seed(self.random_state)
         theta = torch.normal(1, 1, (self.n_sample,))
         x = torch.normal(0, 3, (self.n_sample, 5))
         return x, theta.unsqueeze(1)
     
     def get_observed_data(self):
-        torch.manual_seed(4)
+        torch.manual_seed(self.random_state)
         return torch.normal(0,1, size=(1, 5))
     
     def evaluate(self, mu, sigma, observed_data):
@@ -38,6 +41,7 @@ class NormalNormalDataset(Simulator):
         if dimension > 3:
             raise ValueError("Test case designed for dimensions < 4")
         self.n_sample = n_sample
+        self.random_state = random_state
         self.n_obs = n_obs # something small, like 10 i think
         self.shrinkage = shrinkage # l2 penalty: *std* of prior
         self.noise = noise # *std* of observational error
@@ -45,13 +49,13 @@ class NormalNormalDataset(Simulator):
         self.d_x = dimension
         self.theta_true = COEFFS[:dimension]
 
-        self.data, self.theta = self.simulate_data(random_state)
+        self.data, self.theta = self.simulate_data()
 
     
 
-    def simulate_data(self, random_state):
-        np.random.seed(random_state)
-        torch.manual_seed(random_state)
+    def simulate_data(self):
+        np.random.seed(self.random_state)
+        torch.manual_seed(self.random_state)
         p = self.d_theta
         mu_0 = torch.zeros(p)
         Sigma_0 = self.shrinkage**2 * torch.eye(p)
@@ -73,7 +77,7 @@ class NormalNormalDataset(Simulator):
         return xs.float(), mus.float()
     
     def get_observed_data(self):
-        torch.manual_seed(4)
+        torch.manual_seed(self.random_state)
         p = self.d_theta
         if p == 1:
             x_o = torch.normal(
@@ -114,6 +118,7 @@ class BayesLinRegDataset(Simulator):
         if dimension > 3:
             raise ValueError("Test case designed for dimensions < 4")
         self.n_sample = n_sample
+        self.random_state = random_state
         self.n_obs = n_obs # something small, like 10 i think
         self.shrinkage = shrinkage # l2 penalty--smaller shrinks more
         self.noise = noise
@@ -121,11 +126,11 @@ class BayesLinRegDataset(Simulator):
         self.d_x = dimension * (dimension + 1)
         self.theta_true = COEFFS[:dimension]
 
-        self.data, self.theta = self.simulate_data(random_state)
+        self.data, self.theta = self.simulate_data()
 
-    def simulate_data(self, random_state):
-        np.random.seed(random_state)
-        torch.manual_seed(random_state)
+    def simulate_data(self):
+        np.random.seed(self.random_state)
+        torch.manual_seed(self.random_state)
         p = self.d_theta
         m_0 = torch.zeros(p)
         S_0 = self.shrinkage**2 * torch.eye(p)
@@ -165,8 +170,8 @@ class BayesLinRegDataset(Simulator):
         return m_N, S_N
     
     def get_observed_data(self):
-        np.random.seed(4)
-        torch.manual_seed(4)
+        np.random.seed(self.random_state)
+        torch.manual_seed(self.random_state)
         X = np.random.uniform(low = -5, high=5, size=(self.n_obs, self.d_theta))
         y_o = torch.normal(
             torch.tensor((self.theta_true @ X.T)).clone().detach(),

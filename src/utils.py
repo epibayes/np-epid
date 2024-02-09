@@ -1,7 +1,6 @@
 import torch
 import lightning as L
 from torch.utils.data import DataLoader, random_split
-from torch.utils.data import Dataset
 
 # theoretically, variational dropout takes care of overfitting
 class DataModule(L.LightningDataModule):
@@ -38,28 +37,3 @@ def lower_tri(values, dim):
         tril_ix = torch.tril_indices(dim, dim)
         L[tril_ix[0], tril_ix[1]] = values[0]
     return L
-
-
-class Simulator(Dataset):
-    def __init__(self, n_sample, random_state):
-        self.n_sample = None
-        self.data = None
-        self.theta = None
-        self.d_x = None
-        self.d_theta = None
-
-    def __len__(self):
-        return self.n_sample
-    
-    def __getitem__(self, index):
-        return self.data[index], self.theta[index]
-    
-    def simulate_data(self, random_state):
-        raise NotImplementedError
-    
-    def get_observed_data(self):
-        raise NotImplementedError
-    
-    def evaluate(self, mu, sigma, data):
-        pass
-
