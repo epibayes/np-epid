@@ -36,7 +36,8 @@ class SIModel(Simulator):
         return xs, betas.float()
     
     def get_observed_data(self):
-        return self.SI_simulator(torch.tensor((self.beta_true,)), self.random_state)
+        x_o = self.SI_simulator(torch.tensor((self.beta_true,)), self.random_state)
+        return x_o.unsqueeze(0).float()
 
     def SI_simulator(self, beta, seed=None):
         # beta is infection rate
@@ -46,37 +47,34 @@ class SIModel(Simulator):
         assert len(beta) == self.n_zones + 1
     
         if seed is not None:
-            torch.manual_seed(seed)
-        A  = torch.empty((self.N, self.T)).int()
+            np.random.seed(seed)
+        A  = np.empty((self.N, self.T))
         # assign zones at random
-        Z = torch.multinomial(torch.ones(self.n_zones), num_samples=self.N, replacement=True)
-        # TODO: introduce random room assignments by floor
+        Z = np.random.choice(np.arange(self.n_zones), self.N)
         # seed initial infections
-        A[:, 0] = torch.bernoulli(torch.full((self.N,), self.alpha))
+        A[:, 0] = np.random.binomial(1, self.alpha, self.N)
+
         for t in range(1, self.T):
             I = A[:, t-1]
             # components dependent on individual covariates
-            hazard = I.sum() * torch.full((self.N,), beta[0])
+            hazard = I.sum() * beta[0] * np.ones(self.N)
             if self.n_zones > 1:
-                raise NotImplementedError
                 Zx, Zy = np.meshgrid(Z, Z)
                 # generate contact matrix: each row i indicates who shares a zone with patient i
                 C = (Zx == Zy).astype(int)
                 hazard += (C * I).sum(1) * beta[Z+1]
-            # discharge = np.random.binomial(1, self.gamma, size=self.N)
-            discharge = torch.bernoulli(torch.full((self.N,), self.gamma)).int()
-            p = 1 - torch.exp(-hazard / self.N) # infection probability
-            # if a susceptible person is not discharged, they may experience an infection event
-            A[:, t] = torch.where(((1 - I) * (1 - discharge)).bool(), torch.bernoulli(p).int(), A[:, t])
-            # if a person is discharged, replace them with an infected or susceptible
-            A[:,t] = torch.where(discharge.bool(), torch.bernoulli(torch.full((self.N,), self.alpha)).int(), A[:, t])
+                # TODO: introduce room-level risk
+            p = 1 - np.exp(-hazard / self.N)
+            A[:,t] = np.where(I, np.ones(self.N), np.random.binomial(1, p, self.N))
+            discharge = np.random.binomial(1, self.gamma, size=self.N)
+            A[:,t] = np.where(discharge, np.random.binomial(1, self.alpha, self.N), A[:, t])
 
-        A = A.float()
+        A = torch.tensor(A).float() # make it all float for good measure
         if self.n_zones == 1:
             return A.mean(0) # proportion of infecteds at each time step
         else:
             zone_counts = [A[Z == i].mean(0) for i in range(self.n_zones)]
-            return torch.tensor([A.mean(0)] + zone_counts)
+            return torch.cat([A.mean(0)] + zone_counts)
     
     def sample_beta(self, N):
         if np.isscalar(self.prior_mu) and self.n_zones > 1:
