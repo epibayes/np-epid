@@ -152,7 +152,6 @@ class BayesLinRegDataset(Simulator):
             print(f"Exact posterior: B ~ N({exact_mu.item():.3f}, {exact_sigma.item():.3f})")
         else:
             pass
-        # TODO: figure out how to evaluate multidim case
         
         
     def posterior_mean(self, xtx_o, xty_o):

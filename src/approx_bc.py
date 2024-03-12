@@ -33,7 +33,6 @@ def abc_rejection_sampler(S, epsilon, sample_prior, simulate_data,
     return np.array(samples), errors
 
 def accept_sample(x, x_o, epsilon):
-    # TODO: check that this works for multiple summary statistics
     if x_o.shape[0] == 1:
         error = ((x - x_o)**2).mean()
         accept = (error < epsilon)
