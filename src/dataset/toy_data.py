@@ -28,7 +28,8 @@ class TestDataset(Simulator):
         torch.manual_seed(self.random_state)
         return torch.normal(0,1, size=(1, 5))
     
-    def evaluate(self, mu, sigma, observed_data):
+    def evaluate(self, posterior_params):
+        mu, sigma = posterior_params
         mu_mse = ((mu - 1) ** 2).mean().item()
         sigma_mse = ((sigma - 1)**2).mean().item()
         print(f"mu, MSE: {mu_mse:.3f}")
@@ -88,7 +89,9 @@ class NormalNormalDataset(Simulator):
             x_o = ll_true.rsample((self.n_obs,)).sum(0)
         return x_o.unsqueeze(0)
     
-    def evaluate(self, mu, sigma, x_o):
+    def evaluate(self, posterior_params):
+        mu, sigma = posterior_params
+        x_o = self.get_observed_data()
         exact_mu, exact_sigma = self.posterior_mean(x_o)
         if self.d_theta == 1:
             print(f"Approximate posterior: B ~ N({mu.item():.3f}, {sigma.item():.3f})")
@@ -142,8 +145,9 @@ class BayesLinRegDataset(Simulator):
         data = torch.cat((xtx, xty), 1) # (n_samples, p(p+1))
         return data.float(), torch.tensor(betas).float()
     
-    def evaluate(self, mu, sigma, data_o):
-        data_o = data_o[0]
+    def evaluate(self, posterior_params):
+        mu, sigma = posterior_params
+        data_o = self.get_observed_data()[0]
         xtx_o = data_o[:-self.d_theta]
         xty_o = data_o[-self.d_theta:]
         exact_mu, exact_sigma = self.posterior_mean(xtx_o, xty_o)

@@ -22,5 +22,5 @@ class Simulator(Dataset):
     def get_observed_data(self):
         raise NotImplementedError
     
-    def evaluate(self, mu, sigma, data):
+    def evaluate(self, posterior_params):
         pass

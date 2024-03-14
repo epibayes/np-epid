@@ -1,13 +1,13 @@
 import torch
 import numpy as np
-
 from .simulator import Simulator
 
 
 
 class SIModel(Simulator):
-    def __init__(self, n_sample, random_state, alpha, gamma, beta_true, 
-                 prior_mu, prior_sigma, n_zones, N, T):
+    def __init__(self, alpha, gamma, beta_true, 
+                 prior_mu, prior_sigma, n_zones, N, T, 
+                 random_state=None, n_sample=None):
         self.alpha = alpha # baseline proportion infected in pop
         self.gamma = gamma # discharge rate
         self.N = N
@@ -18,34 +18,37 @@ class SIModel(Simulator):
         self.n_zones = n_zones
         self.d_theta = 1 if n_zones == 1 else 1 + n_zones
         self.d_x = T * self.d_theta
-        # self.x_o = self.simulate_SIS(beta_true, seed=29)
+        if np.isscalar(beta_true):
+            beta_true = [beta_true]
         self.beta_true = beta_true
         self.n_sample = n_sample
         self.random_state = random_state
-        self.data, self.theta = self.simulate_data()
+        if n_sample is not None:
+            self.data, self.theta = self.simulate_data()
 
 
     def simulate_data(self):
-        torch.manual_seed(self.random_state)
-        betas = self.sample_beta(self.n_sample)
+        logbetas = self.sample_logbeta(self.n_sample)
         xs = torch.empty((self.n_sample, self.d_x))
         # consider vectorizing if this ends up being slow
         for i in range(self.n_sample):
-            xs[i] = self.SI_simulator(betas[i], self.random_state)
+            xs[i] = self.SI_simulator(logbetas[i], self.random_state)
 
-        return xs, betas.float()
+        return xs, logbetas.float()
     
     def get_observed_data(self):
-        x_o = self.SI_simulator(torch.tensor((self.beta_true,)), self.random_state)
+        # TODO: need to handle case where beta_true is a list
+        logbeta_true = torch.log(torch.tensor(self.beta_true))
+        x_o = self.SI_simulator(logbeta_true, 29)
         return x_o.unsqueeze(0).float()
 
-    def SI_simulator(self, beta, seed=None):
+    def SI_simulator(self, logbeta, seed=None):
         # beta is infection rate
-        assert type(beta) is torch.Tensor
-        if len(beta) == 1:
-            beta = torch.tensor((beta.item(), 0))
-        assert len(beta) == self.n_zones + 1
-    
+        assert type(logbeta) is torch.Tensor
+        if len(logbeta) == 1:
+            logbeta = torch.tensor((logbeta.item(), 0))
+        assert len(logbeta) == self.n_zones + 1
+        beta = torch.exp(logbeta)
         if seed is not None:
             np.random.seed(seed)
         A  = np.empty((self.N, self.T))
@@ -76,11 +79,13 @@ class SIModel(Simulator):
             zone_counts = [A[Z == i].mean(0) for i in range(self.n_zones)]
             return torch.cat([A.mean(0)] + zone_counts)
     
-    def sample_beta(self, N):
+    def sample_logbeta(self, N):
+        if self.random_state is not None:
+            torch.manual_seed(self.random_state)
         if np.isscalar(self.prior_mu) and self.n_zones > 1:
+            #TODO: implement this!
             raise NotImplementedError
-            # log_beta = np.random.normal(self.prior_mu, self.prior_sigma, self.n_zones + 1)
         else:
             log_beta = torch.normal(self.prior_mu, self.prior_sigma, (N, 1))
-        return torch.exp(log_beta)
+        return log_beta
 

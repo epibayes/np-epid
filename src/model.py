@@ -15,7 +15,6 @@ class GaussianDensityNetwork(L.LightningModule):
         self.dim = d_theta
         n_sigma = d_theta + d_theta * (d_theta - 1) // 2
         n_outputs = self.dim + n_sigma
-
         self.ff = torch.nn.Sequential(
             Linear(d_x, d_model),
             Dropout(dropout), ReLU(),
@@ -27,6 +26,7 @@ class GaussianDensityNetwork(L.LightningModule):
         )
         # eventually need to save this as an hparam if i am checkpointing models
         self.lr = lr
+        self.val_losses = []
 
     def forward(self, x):
         assert len(x.shape) == 2
@@ -54,6 +54,11 @@ class GaussianDensityNetwork(L.LightningModule):
         loss = self.gaussiannll(theta, mu, sigma)
         self.log("val_loss", loss)
         return loss
+    
+    def on_validation_epoch_end(self):
+        # why was this so difficult to figure out
+        val_loss = self.trainer.callback_metrics["val_loss"].item()
+        self.val_losses.append(val_loss)
 
     def gaussiannll(self, theta, mu, sigma):
         p = self.dim
@@ -69,7 +74,7 @@ class GaussianDensityNetwork(L.LightningModule):
     
 
     def configure_optimizers(self):
-        # TODO: consider swapping out for SGD with 
+        # TODO: consider swapping out for SGD with decay
         return torch.optim.AdamW(self.parameters(), lr=self.lr)
     
 

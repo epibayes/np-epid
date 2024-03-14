@@ -4,7 +4,7 @@ from timeit import default_timer as timer
 # frustrating i can't call this abc.py
 
 
-def abc_rejection_sampler(S, epsilon, sample_prior, simulate_data, 
+def abc_rejection_sampler(S, epsilon, prior_sampler, simulator, 
                           x_o, max_attempts=10000):
     # S: total number of particles
     samples = []
@@ -14,11 +14,11 @@ def abc_rejection_sampler(S, epsilon, sample_prior, simulate_data,
     for s in range(S):
         accept = False
         while not accept:
-            theta = sample_prior()
-            x = simulate_data(theta, seed=attempts)
+            theta = prior_sampler()
+            x = simulator(theta, seed=attempts)
             accept, error = accept_sample(x, x_o, epsilon)
             if accept:
-                samples.append(theta)
+                samples.append(theta.item())
             errors[attempts] = error
             attempts += 1
             if attempts == max_attempts:

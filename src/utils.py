@@ -1,6 +1,8 @@
 import torch
 import lightning as L
 from torch.utils.data import DataLoader, random_split
+import yaml
+import math
 
 # theoretically, variational dropout takes care of overfitting
 class DataModule(L.LightningDataModule):
@@ -37,3 +39,20 @@ def lower_tri(values, dim):
         tril_ix = torch.tril_indices(dim, dim)
         L[tril_ix[0], tril_ix[1]] = values[0]
     return L
+
+def save_results(posterior_params, val_losses, cfg):
+    # TODO: fix this for multidimensional case
+    mu = posterior_params[0].item()
+    sigma = posterior_params[1].item()
+    print(round(mu, 3))
+    print(round(sigma, 3))
+    results = {"mu": mu, "sigma":sigma,
+               "val_loss": min(val_losses),
+               "n_sample": cfg[cfg.experiment]["n_sample"], 
+               "seed": cfg[cfg.experiment]["random_state"],
+               "learning_rate": cfg["model"]["lr"],
+               "d_model": cfg["model"]["d_model"],
+               "batch_size": cfg["train"]["batch_size"]}
+    # should probably save seed, etc.
+    with open("results.yaml", "w", encoding="utf-8") as yaml_file:
+        yaml.dump(results, yaml_file)

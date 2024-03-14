@@ -4,17 +4,15 @@ import lightning as L
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
 from hydra.utils import instantiate
+from src.utils import DataModule, save_results
 
-# from src.dataset import ExponentialToyDataset
-from src.utils import DataModule
+TOY_EXPERIMENTS = ("test-dataset", "normal-normal", "bayes-linreg")
 
 @hydra.main(config_path=".", config_name="config.yaml", version_base=None)
 def main(cfg=None):
     data_cfg = cfg[cfg.experiment]
     dataset = instantiate(data_cfg)
     observed_data = dataset.get_observed_data()
-
-
     datamodule = DataModule(
         dataset, cfg.train.seed, cfg.train.batch_size, cfg.train.train_frac
         )
@@ -27,8 +25,11 @@ def main(cfg=None):
 
     trainer.fit(model, datamodule=datamodule)
 
-    mu, sigma = model.predict_step(observed_data)
-    dataset.evaluate(mu, sigma, observed_data)
+    posterior_params = model.predict_step(observed_data)
+    if cfg.experiment in TOY_EXPERIMENTS:
+        dataset.evaluate(posterior_params)
+    else:
+        save_results(posterior_params, model.val_losses, cfg)
     wandb.finish()
 
 
