@@ -6,3 +6,4 @@ lightning_logs
 .vscode
 .DS_Store
 multirun
+.ipynb_checkpoints

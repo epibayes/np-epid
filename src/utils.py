@@ -44,6 +44,7 @@ def save_results(posterior_params, val_losses, cfg):
     # TODO: fix this for multidimensional case
     mu = posterior_params[0].item()
     sigma = posterior_params[1].item()
+    print(round(math.exp(mu), 3))
     print(round(mu, 3))
     print(round(sigma, 3))
     results = {"mu": mu, "sigma":sigma,
