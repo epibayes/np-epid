@@ -7,3 +7,4 @@ lightning_logs
 .DS_Store
 multirun
 .ipynb_checkpoints
+development.md

@@ -5,15 +5,21 @@ from .simulator import Simulator
 
 
 class SIModel(Simulator):
-    def __init__(self, alpha, gamma, beta_true, 
-                 prior_mu, prior_sigma, n_zones, N, T, summarize,
+    def __init__(self, alpha, gamma, beta_true, n_zones,
+                 prior_mu, prior_sigma,  N, T, summarize,
                  random_state=None, n_sample=None):
         self.alpha = alpha # baseline proportion infected in pop
         self.gamma = gamma # discharge rate
+        if np.isscalar(beta_true):
+            self.beta_true = [beta_true]
+        else:
+            self.beta_true = beta_true
         self.N = N
         self.T = T
         self.n_zones = n_zones
         self.d_theta = 1 if n_zones == 1 else 1 + n_zones
+        assert self.d_theta == len(self.beta_true)
+        self.set_prior(prior_mu, prior_sigma)
         if summarize: 
             self.d_x = self.d_theta
         else:
@@ -21,37 +27,35 @@ class SIModel(Simulator):
         self.summarize = summarize
         self.n_sample = n_sample
         self.random_state = random_state
-        if np.isscalar(beta_true):
-            self.beta_true = [beta_true]
-            self.prior_mu = prior_mu
-            self.prior_sigma = prior_sigma
-        else:
-            self.beta_true = beta_true
-            self.set_multidim_prior(prior_mu, prior_sigma)
+        # homogeneous infection rate
 
         if n_sample is not None:
             self.data, self.theta = self.simulate_data()
 
-    def set_multidim_prior(self, mu, sigma):
+    def set_prior(self, mu, sigma):
+        if self.d_theta == 1:
+            self.prior_mu = mu
+            self.prior_sigma = sigma
+            return
         if np.isscalar(mu):
             self.mu = torch.tensor([mu for _ in range(self.d_theta)])
         else:
             self.mu = torch.tensor(mu)
-        # TODO: generalize beyond diagonal covariance
         if np.isscalar(sigma):
             diag = torch.tensor([sigma for _ in range(self.d_theta)])
         else:
             diag = torch.tensor(sigma)
         self.sigma = torch.diag(diag)
-        assert self.mu.shape == self.beta_true.shape
-        assert diag.shape == self.beta_true.shape
+        assert self.mu.shape[0] == len(self.beta_true)
+        assert diag.shape[0] == len(self.beta_true)
 
     def simulate_data(self):
         logbetas = self.sample_logbeta(self.n_sample)
         xs = torch.empty((self.n_sample, self.d_x))
         # consider vectorizing if this ends up being slow
         for i in range(self.n_sample):
-            xs[i] = self.SI_simulator(logbetas[i], self.random_state)
+            xs[i] = self.SI_simulator(
+                np.array(logbetas[i]), self.random_state)
 
         return xs, logbetas.float()
     
@@ -59,18 +63,20 @@ class SIModel(Simulator):
         # TODO: need to handle case where beta_true is a list
         # or do I...
         logbeta_true = torch.log(torch.tensor(self.beta_true))
-        x_o = self.SI_simulator(logbeta_true, observed_seed)
+        x_o = self.SI_simulator(
+            np.array(logbeta_true), observed_seed)
         # return x_o.unsqueeze(0).float()
         if self.summarize:
             x_o = x_o.unsqueeze(0)
-        return x_o.unsqueeze(0).float()
+        if self.n_zones == 1:
+            x_o - x_o.unsqueeze(0)
+        return x_o.float()
 
     def SI_simulator(self, logbeta, seed=None):
         # beta is infection rate
-        assert type(logbeta) is torch.Tensor
-        beta = torch.exp(logbeta)
+        beta = np.exp(logbeta)
         if len(beta) == 1:
-            beta = torch.tensor((beta.item(), 0))
+            beta = np.array(((beta[0]), 0))
         assert len(beta) == self.n_zones + 1
         if seed is not None:
             np.random.seed(seed)
@@ -96,14 +102,12 @@ class SIModel(Simulator):
             A[:,t] = np.where(discharge, np.random.binomial(1, self.alpha, self.N), A[:, t])
 
         A = torch.tensor(A).float() # make it all float for good measure
+        w = None if self.summarize else 0
         if self.n_zones == 1:
-            if self.summarize:
-                return A.mean()
-            else:
-                return A.mean(0)
+            return A.mean(w)
         else:
-            zone_counts = [A[Z == i].mean(0) for i in range(self.n_zones)]
-            return torch.cat([A.mean(0)] + zone_counts)
+            zone_counts = [A[Z == i].mean(w) for i in range(self.n_zones)]
+            return torch.stack([A.mean(w)] + zone_counts)
     
     def sample_logbeta(self, N):
         if self.random_state is not None:

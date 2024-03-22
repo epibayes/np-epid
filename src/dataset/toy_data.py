@@ -99,11 +99,8 @@ class NormalNormalDataset(Simulator):
         else:
             mu_error = (mu - exact_mu)**2
             print(f"Average mu error: {mu_error.mean().item():.3f}")
-            L = lower_tri(sigma, self.d_theta)
-            cov_est = L @ L.T
-            cov_true = exact_sigma * torch.eye(self.d_theta)
-            cov_error = torch.linalg.matrix_norm(cov_est - cov_true)
-            print(f"Cov. matrix error: {cov_error.item():.3f}")
+            sigma_error = (sigma - exact_sigma)**2
+            print(f"Average sigma error: {sigma_error.mean().item():.3f}")
 
     def posterior_mean(self, x_o):
         # sanity check this for MVN

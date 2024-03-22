@@ -10,11 +10,10 @@ from src.utils import lower_tri
 class GaussianDensityNetwork(L.LightningModule):
     def __init__(self, d_x, d_theta, d_model, dropout, lr):
         super().__init__()
-
         # compute number of outputs
         self.dim = d_theta
-        n_sigma = d_theta + d_theta * (d_theta - 1) // 2
-        n_outputs = self.dim + n_sigma
+        # assume diagonal covariance matrix
+        n_outputs = self.dim * 2
         self.ff = torch.nn.Sequential(
             Linear(d_x, d_model),
             Dropout(dropout), ReLU(),
@@ -66,7 +65,7 @@ class GaussianDensityNetwork(L.LightningModule):
             normal = Normal(mu, sigma)
             l = - normal.log_prob(theta)
         else:
-            L = lower_tri(sigma, p)
+            L = torch.diag_embed(sigma)
             mvn = MultivariateNormal(loc=mu, scale_tril=L)
             l = - mvn.log_prob(theta)
 
