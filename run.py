@@ -29,7 +29,8 @@ def main(cfg=None):
     if cfg.experiment in TOY_EXPERIMENTS:
         dataset.evaluate(posterior_params)
     else:
-        save_results(posterior_params, model.val_losses, cfg)
+        multidim = (dataset.d_theta > 1)
+        save_results(posterior_params, model.val_losses, cfg, multidim)
     wandb.finish()
 
 

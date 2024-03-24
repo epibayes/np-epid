@@ -62,22 +62,22 @@ class SIModel(Simulator):
                 # in a given training sample
                 rs = self.random_state * i
             xs[i] = self.SI_simulator(
-                np.array(logbetas[i]), rs)
+                np.array(logbetas[i]), rs).flatten()
 
         return xs, logbetas.float()
     
     def get_observed_data(self, observed_seed=29):
-        # TODO: need to handle case where beta_true is a list
-        # or do I...
         logbeta_true = torch.log(torch.tensor(self.beta_true))
         x_o = self.SI_simulator(
             np.array(logbeta_true), observed_seed)
         # return x_o.unsqueeze(0).float()
         if self.summarize:
             # x_o = x_o.unsqueeze(0)
-            x_o = x_o.unsqueeze(-1)
+            x_o = x_o.unsqueeze(0)
         if self.d_theta == 1:
             x_o = x_o.unsqueeze(0)
+        if not (self.summarize or (self.d_theta == 1)):
+            x_o = x_o.flatten().unsqueeze(0)
         return x_o.float()
 
     def SI_simulator(self, logbeta, seed=None):

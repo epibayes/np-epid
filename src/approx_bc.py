@@ -9,7 +9,7 @@ def abc_rejection_sampler(S, epsilon, prior_sampler, simulator,
     # S: total number of particles
     samples = []
     attempts = 0
-    # # TODO: error shape should be related to d_theta...
+    #TODO: need to transpose x_o in case of summarization
     errors = np.full((max_attempts, x_o.shape[0]), -1e3)
     start_time = timer()
     for s in range(S):
