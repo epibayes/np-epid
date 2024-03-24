@@ -5,20 +5,21 @@ from timeit import default_timer as timer
 
 
 def abc_rejection_sampler(S, epsilon, prior_sampler, simulator, 
-                          x_o, max_attempts=10000):
+                          x_o, max_attempts=10000, summarize=False):
     # S: total number of particles
     samples = []
     attempts = 0
-    errors = np.full((max_attempts,), -1e3)
+    # # TODO: error shape should be related to d_theta...
+    errors = np.full((max_attempts, x_o.shape[0]), -1e3)
     start_time = timer()
     for s in range(S):
         accept = False
         while not accept:
-            theta = prior_sampler()
+            theta = np.array(prior_sampler())[0]
             x = simulator(theta, seed=attempts)
-            accept, error = accept_sample(x, x_o, epsilon)
+            accept, error = accept_sample(x, x_o, epsilon, summarize)
             if accept:
-                samples.append(theta.item())
+                samples.append(theta)
             errors[attempts] = error
             attempts += 1
             if attempts == max_attempts:
@@ -32,11 +33,15 @@ def abc_rejection_sampler(S, epsilon, prior_sampler, simulator,
     print(f"Total number of attempts: {attempts:,}")
     return np.array(samples), errors
 
-def accept_sample(x, x_o, epsilon):
-    if x_o.shape[0] == 1:
-        error = ((x - x_o)**2).mean()
-        accept = (error < epsilon)
-    else:
-        error = ((x - x_o)**2).mean(1).max()
-        accept = (error < epsilon)
+def accept_sample(x, x_o, epsilon, summarize):
+    # error should have dimension (d_theta, d_x)
+    if summarize:
+        x_o = x_o[0]
+    w = 1 if len(x_o) > 1 else None
+    error = ((x - x_o)**2)
+    if not summarize:
+        error = error.mean(w)
+    accept = (error < epsilon)
+    if accept.dim() > 0:
+        accept = accept.min()
     return accept, error

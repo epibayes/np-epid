@@ -1,8 +1,7 @@
 import torch
 import numpy as np
 from .simulator import Simulator
-
-
+from torch.distributions import MultivariateNormal, Normal
 
 class SIModel(Simulator):
     def __init__(self, alpha, gamma, beta_true, n_zones,
@@ -38,24 +37,32 @@ class SIModel(Simulator):
             self.prior_sigma = sigma
             return
         if np.isscalar(mu):
-            self.mu = torch.tensor([mu for _ in range(self.d_theta)])
+            prior_mu = torch.tensor([mu for _ in range(self.d_theta)])
         else:
-            self.mu = torch.tensor(mu)
+            prior_mu = torch.tensor(mu)
         if np.isscalar(sigma):
             diag = torch.tensor([sigma for _ in range(self.d_theta)])
         else:
             diag = torch.tensor(sigma)
-        self.sigma = torch.diag(diag)
-        assert self.mu.shape[0] == len(self.beta_true)
+        prior_sigma = torch.diag(diag)
+        assert prior_mu.shape[0] == len(self.beta_true)
         assert diag.shape[0] == len(self.beta_true)
+        self.prior_mu = prior_mu.float()
+        self.prior_sigma = prior_sigma.float()
 
     def simulate_data(self):
         logbetas = self.sample_logbeta(self.n_sample)
         xs = torch.empty((self.n_sample, self.d_x))
         # consider vectorizing if this ends up being slow
         for i in range(self.n_sample):
+            if self.random_state is None:
+                rs = None
+            else:
+                # this should minimize correlation between data
+                # in a given training sample
+                rs = self.random_state * i
             xs[i] = self.SI_simulator(
-                np.array(logbetas[i]), self.random_state)
+                np.array(logbetas[i]), rs)
 
         return xs, logbetas.float()
     
@@ -67,9 +74,10 @@ class SIModel(Simulator):
             np.array(logbeta_true), observed_seed)
         # return x_o.unsqueeze(0).float()
         if self.summarize:
+            # x_o = x_o.unsqueeze(0)
+            x_o = x_o.unsqueeze(-1)
+        if self.d_theta == 1:
             x_o = x_o.unsqueeze(0)
-        if self.n_zones == 1:
-            x_o - x_o.unsqueeze(0)
         return x_o.float()
 
     def SI_simulator(self, logbeta, seed=None):
@@ -82,7 +90,10 @@ class SIModel(Simulator):
             np.random.seed(seed)
         A  = np.empty((self.N, self.T))
         # assign zones at random
-        Z = np.random.choice(np.arange(self.n_zones), self.N)
+        Z = np.arange(self.N) % self.n_zones
+        # floor assignment: similar principle; 
+        # just make sure floor numbers are a multiple of n_zones
+        # Z = np.random.choice(np.arange(self.n_zones), self.N)
         # seed initial infections
         A[:, 0] = np.random.binomial(1, self.alpha, self.N)
 
@@ -102,6 +113,8 @@ class SIModel(Simulator):
             A[:,t] = np.where(discharge, np.random.binomial(1, self.alpha, self.N), A[:, t])
 
         A = torch.tensor(A).float() # make it all float for good measure
+        #TODO: fix mean calculation
+        # is it as simple as offsetting by first element of A?
         w = None if self.summarize else 0
         if self.n_zones == 1:
             return A.mean(w)
@@ -112,10 +125,10 @@ class SIModel(Simulator):
     def sample_logbeta(self, N):
         if self.random_state is not None:
             torch.manual_seed(self.random_state)
-        if np.isscalar(self.prior_mu) and self.n_zones > 1:
-            #TODO: implement this!
-            raise NotImplementedError
-        else:
+        if self.d_theta == 1:
             log_beta = torch.normal(self.prior_mu, self.prior_sigma, (N, 1))
+        else:
+            mvn = MultivariateNormal(self.prior_mu, self.prior_sigma)
+            log_beta = mvn.sample((N,))
         return log_beta
 

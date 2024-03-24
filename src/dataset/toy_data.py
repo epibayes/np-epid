@@ -2,7 +2,6 @@ import torch
 import numpy as np
 from torch.distributions import MultivariateNormal, Normal
 
-from src.utils import lower_tri
 from .simulator import Simulator
 
 COEFFS = torch.tensor([1.45, 1.79, 0.49])
