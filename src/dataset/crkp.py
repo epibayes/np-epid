@@ -65,7 +65,6 @@ class CRKPTransmissionSimulator:
 
     def simulate_data(self, N):
         simulations = []
-        # TODO: move generating beta to here?
         for _ in range(N):
             # generate beta
             # lognormal prior

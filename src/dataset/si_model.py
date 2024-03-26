@@ -113,7 +113,6 @@ class SIModel(Simulator):
             A[:,t] = np.where(discharge, np.random.binomial(1, self.alpha, self.N), A[:, t])
 
         A = torch.tensor(A).float() # make it all float for good measure
-        #TODO: fix mean calculation
         # is it as simple as offsetting by first element of A?
         w = None if self.summarize else 0
         if self.n_zones == 1:

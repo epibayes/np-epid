@@ -45,8 +45,6 @@ class GaussianDensityNetwork(L.LightningModule):
 
     
     def validation_step(self, batch, batch_idx):
-        # TODO: might be helpful to log how the estimated posterior evolves over time
-        # would entail passing in the "observed" data though
         x, theta = batch
         assert len(theta.shape) > 1
         mu, sigma = self(x)

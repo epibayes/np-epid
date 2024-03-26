@@ -47,7 +47,7 @@ train:
   train_frac: 0.75
   batch_size: 64
   # random seed for train-validation split
-  seed: 29
+  seed: 11
   max_epochs: 10
   log_freq: 4
 
