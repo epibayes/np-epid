@@ -29,7 +29,7 @@ si-model:
   _target_: src.dataset.SIModel
   <<: *simulator
   alpha: 0.1 #baseline proportion infected 
-  gamma: 0.0 # discharge rate
+  gamma: 0.05 # discharge rate
   beta_true: 0.15 # true infection rate
   prior_mu: -3
   prior_sigma: 1

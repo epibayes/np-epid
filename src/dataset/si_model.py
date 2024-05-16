@@ -6,7 +6,7 @@ from torch.distributions import MultivariateNormal, Normal
 class SIModel(Simulator):
     def __init__(self, alpha, gamma, beta_true, n_zones,
                  prior_mu, prior_sigma,  N, T, summarize,
-                 random_state=None, n_sample=None):
+                 room=False, random_state=None, n_sample=None):
         self.alpha = alpha # baseline proportion infected in pop
         self.gamma = gamma # discharge rate
         if np.isscalar(beta_true):
@@ -16,7 +16,8 @@ class SIModel(Simulator):
         self.N = N
         self.T = T
         self.n_zones = n_zones
-        self.d_theta = 1 if n_zones == 1 else 1 + n_zones
+        self.room = room
+        self.d_theta = 1 if n_zones == 1 else 1 + n_zones + int(room)
         assert self.d_theta == len(self.beta_true)
         self.set_prior(prior_mu, prior_sigma)
         if summarize: 
