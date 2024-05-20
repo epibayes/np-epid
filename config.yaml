@@ -2,8 +2,8 @@ experiment: si-model
 
 simulator: &simulator
   n_sample: 256
-  random_state: 5
 
+observed_seed: 29
 
 test-dataset:
   _target_: src.dataset.TestDataset

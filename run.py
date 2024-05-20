@@ -12,7 +12,7 @@ TOY_EXPERIMENTS = ("test-dataset", "normal-normal", "bayes-linreg")
 def main(cfg=None):
     data_cfg = cfg[cfg.experiment]
     dataset = instantiate(data_cfg)
-    observed_data = dataset.get_observed_data()
+    observed_data = dataset.get_observed_data(cfg["observed_seed"])
     datamodule = DataModule(
         dataset, cfg.train.seed, cfg.train.batch_size, cfg.train.train_frac
         )

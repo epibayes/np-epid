@@ -48,7 +48,7 @@ def save_results(posterior_params, val_losses, cfg,
     else:
         mu = posterior_params[0].item()
         sigma = posterior_params[1].item()
-    print(np.round(np.exp(mu), 3))
+    print(np.round(np.exp(mu + sigma**2 / 2), 3))
     print(np.round(mu, 3))
     print(np.round(sigma, 3))
     results = {"mu": mu, "sigma":sigma,

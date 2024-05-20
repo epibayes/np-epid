@@ -6,7 +6,7 @@ from torch.distributions import MultivariateNormal, Normal
 class SIModel(Simulator):
     def __init__(self, alpha, gamma, beta_true, n_zones,
                  prior_mu, prior_sigma,  N, T, summarize,
-                 room=False, random_state=None, n_sample=None):
+                 room=False, n_sample=None):
         self.alpha = alpha # baseline proportion infected in pop
         self.gamma = gamma # discharge rate
         if np.isscalar(beta_true):
@@ -26,7 +26,6 @@ class SIModel(Simulator):
             self.d_x = T * self.d_theta
         self.summarize = summarize
         self.n_sample = n_sample
-        self.random_state = random_state
         # homogeneous infection rate
 
         if n_sample is not None:
@@ -56,18 +55,13 @@ class SIModel(Simulator):
         xs = torch.empty((self.n_sample, self.d_x))
         # consider vectorizing if this ends up being slow
         for i in range(self.n_sample):
-            if self.random_state is None:
-                rs = None
-            else:
-                # this should minimize correlation between data
-                # in a given training sample
-                rs = self.random_state * i
+            rs = 5 * i
             xs[i] = self.SI_simulator(
                 np.array(logbetas[i]), rs).flatten()
 
         return xs, logbetas.float()
     
-    def get_observed_data(self, observed_seed=29):
+    def get_observed_data(self, observed_seed):
         logbeta_true = torch.log(torch.tensor(self.beta_true))
         x_o = self.SI_simulator(
             np.array(logbeta_true), observed_seed)

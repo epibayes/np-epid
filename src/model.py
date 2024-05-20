@@ -76,5 +76,6 @@ class GaussianDensityNetwork(L.LightningModule):
     
 
     def predict_step(self, x):
+        # this returns standard deviation!
         mu, sigma = self(x)
         return mu, sigma
