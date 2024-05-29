@@ -55,7 +55,7 @@ def save_results(posterior_params, val_losses, cfg,
         mu = posterior_params[0].tolist()
         #TODO: fix this
         L = posterior_params[1]
-        sigma = L @ L.T
+        sigma = (L @ L.T).tolist()
         sdiag = (L @ L.T).diag().tolist()
         lognormal_mean = np.exp(
             np.array(mu) + np.array(sdiag) / 2
@@ -75,7 +75,7 @@ def save_results(posterior_params, val_losses, cfg,
                "seed": cfg[cfg.experiment]["observed_seed"],
                "batch_size": cfg["train"]["batch_size"]}
     for key in cfg["model"]:
-        results["key"] = cfg["model"][key]
+        results[key] = cfg["model"][key]
     # should probably save seed, etc.
     with open("results.yaml", "w", encoding="utf-8") as yaml_file:
         yaml.dump(results, yaml_file)
