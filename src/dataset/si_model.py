@@ -6,7 +6,7 @@ from torch.distributions import MultivariateNormal, Normal
 class SIModel(Simulator):
     def __init__(self, alpha, gamma, beta_true, n_zones,
                  prior_mu, prior_sigma,  N, T, summarize,
-                 room=False, n_sample=None):
+                 observed_seed, room=False, n_sample=None):
         self.alpha = alpha # baseline proportion infected in pop
         self.gamma = gamma # discharge rate
         if np.isscalar(beta_true):
@@ -26,10 +26,9 @@ class SIModel(Simulator):
             self.d_x = T * self.d_theta
         self.summarize = summarize
         self.n_sample = n_sample
-        # homogeneous infection rate
-
         if n_sample is not None:
             self.data, self.theta = self.simulate_data()
+        self.obs = observed_seed
 
     def set_prior(self, mu, sigma):
         if self.d_theta == 1:
@@ -51,7 +50,7 @@ class SIModel(Simulator):
         self.prior_sigma = prior_sigma.float()
 
     def simulate_data(self):
-        logbetas = self.sample_logbeta(self.n_sample)
+        logbetas = self.sample_logbeta(self.n_sample, seed=5)
         xs = torch.empty((self.n_sample, self.d_x))
         # consider vectorizing if this ends up being slow
         for i in range(self.n_sample):
@@ -61,7 +60,9 @@ class SIModel(Simulator):
 
         return xs, logbetas.float()
     
-    def get_observed_data(self, observed_seed):
+    def get_observed_data(self, observed_seed=None):
+        if observed_seed is None:
+            observed_seed = self.obs
         logbeta_true = torch.log(torch.tensor(self.beta_true))
         x_o = self.SI_simulator(
             np.array(logbeta_true), observed_seed)
@@ -116,9 +117,9 @@ class SIModel(Simulator):
             zone_counts = [A[Z == i].mean(w) for i in range(self.n_zones)]
             return torch.stack([A.mean(w)] + zone_counts)
     
-    def sample_logbeta(self, N):
-        if self.random_state is not None:
-            torch.manual_seed(self.random_state)
+    def sample_logbeta(self, N, seed=None):
+        if seed is not None:
+            torch.manual_seed(seed)
         if self.d_theta == 1:
             log_beta = torch.normal(self.prior_mu, self.prior_sigma, (N, 1))
         else:

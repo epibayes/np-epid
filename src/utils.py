@@ -45,19 +45,29 @@ def save_results(posterior_params, val_losses, cfg,
     if multidim:
         mu = posterior_params[0].tolist()
         sigma = posterior_params[1].tolist()
+        lognormal_mean = np.exp(
+            np.array(mu) + np.array(sigma)**2 / 2
+        )
+        print(np.round(lognormal_mean, 3))
+        print(np.round(mu, 3))
+        print(np.round(sigma, 3))
+
     else:
         mu = posterior_params[0].item()
         sigma = posterior_params[1].item()
-    print(np.round(np.exp(mu + sigma**2 / 2), 3))
-    print(np.round(mu, 3))
-    print(np.round(sigma, 3))
+        print(np.round(np.exp(mu + sigma**2 / 2), 3))
+        print(np.round(mu, 3))
+        print(np.round(sigma, 3))
     results = {"mu": mu, "sigma":sigma,
-               "val_loss": min(val_losses),
-               "n_sample": cfg[cfg.experiment]["n_sample"], 
-               "seed": cfg[cfg.experiment]["random_state"],
-               "learning_rate": cfg["model"]["lr"],
-               "d_model": cfg["model"]["d_model"],
+               "val_loss": val_losses[-1],
+               "n_sample": cfg[cfg.experiment]["n_sample"],
+               "seed": cfg[cfg.experiment]["observed_seed"],
                "batch_size": cfg["train"]["batch_size"]}
+            #         "d_model": cfg["model"]["d_model"],
+            #    "weight_decay": cfg["model"]["weight_decay"],
+            #    "mean_field": cfg["model"][""]
+    for key in cfg["model"]:
+        results["key"] = cfg["model"][key]
     # should probably save seed, etc.
     with open("results.yaml", "w", encoding="utf-8") as yaml_file:
         yaml.dump(results, yaml_file)

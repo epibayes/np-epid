@@ -23,7 +23,7 @@ prior_sampler = lambda: si_model.sample_logbeta(1)
 simulator = lambda theta, seed: si_model.SI_simulator(theta, seed)
 
 S = 100
-epsilon = 0.01
+epsilon = 10
 posterior_sample, errors = abc_rejection_sampler(
     S, epsilon, prior_sampler, simulator, x_o, max_attempts=500,
       summarize=summarize

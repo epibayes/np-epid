@@ -8,12 +8,16 @@ from src.utils import lower_tri
 
 
 class GaussianDensityNetwork(L.LightningModule):
-    def __init__(self, d_x, d_theta, d_model, dropout, lr):
+    def __init__(self, d_x, d_theta, d_model, dropout, lr, weight_decay,
+                 mean_field):
         super().__init__()
         # compute number of outputs
         self.dim = d_theta
         # assume diagonal covariance matrix
-        n_outputs = self.dim * 2
+        if mean_field:
+            n_outputs = self.dim * 2
+        else:
+            n_outputs = self.dim + self.dim*(self.dim + 1) / 2
         self.ff = torch.nn.Sequential(
             Linear(d_x, d_model),
             Dropout(dropout), ReLU(),
@@ -25,6 +29,7 @@ class GaussianDensityNetwork(L.LightningModule):
         )
         # eventually need to save this as an hparam if i am checkpointing models
         self.lr = lr
+        self.wd = weight_decay
         self.val_losses = []
 
     def forward(self, x):
@@ -71,8 +76,7 @@ class GaussianDensityNetwork(L.LightningModule):
     
 
     def configure_optimizers(self):
-        # TODO: consider swapping out for SGD with decay
-        return torch.optim.AdamW(self.parameters(), lr=self.lr)
+        return torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.wd)
     
 
     def predict_step(self, x):

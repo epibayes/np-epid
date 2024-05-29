@@ -2,12 +2,12 @@ from src.dataset import SIModel
 from src.approx_bc import abc_rejection_sampler
 import numpy as np
 
-beta_true = [0.05, 0.05, 0.15, .4]
+beta_true = [0.05, 0.2, 0.3, .4]
 alpha = 0.1
 gamma = 0.05
 prior_mu = -3
 prior_sigma = 1
-n_zones = 2
+n_zones = 3
 N = 100
 T = 52
 K = 30

@@ -3,6 +3,7 @@ import wandb
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from hydra.utils import instantiate
 from src.utils import DataModule, save_results
 
@@ -12,14 +13,23 @@ TOY_EXPERIMENTS = ("test-dataset", "normal-normal", "bayes-linreg")
 def main(cfg=None):
     data_cfg = cfg[cfg.experiment]
     dataset = instantiate(data_cfg)
-    observed_data = dataset.get_observed_data(cfg["observed_seed"])
+    observed_data = dataset.get_observed_data()
+    if cfg.train.batch_size is None:
+        batch_size = data_cfg.n_sample
+    else:
+        batch_size = cfg.train.batch_size
     datamodule = DataModule(
-        dataset, cfg.train.seed, cfg.train.batch_size, cfg.train.train_frac
+        dataset, cfg.train.seed, batch_size, cfg.train.train_frac
         )
     model = instantiate(cfg.model, dataset.d_x, dataset.d_theta)
     wandb.init(reinit=False)
     logger = WandbLogger(project='crkp')
-    callbacks = [ModelCheckpoint(monitor="val_loss", mode="min")]
+    # callbacks = [ModelCheckpoint(monitor="val_loss", mode="min")]
+    # callbacks = None
+    if cfg.train.stop_early:
+        callbacks = callbacks=[EarlyStopping(monitor="val_loss", mode="min", patience=cfg.train.patience)]
+    else:
+        callbacks = None
     trainer = L.Trainer(max_epochs=cfg.train.max_epochs, logger=logger,
                         log_every_n_steps=cfg.train.log_freq, callbacks=callbacks)
 
