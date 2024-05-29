@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Neural posterior estimation for simulation-based inference in transmission modeling"
 authors = ["chathasphere <pgchatha@gmail.com>"]
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.11"

@@ -58,6 +58,7 @@ train:
   log_freq: 4
   patience: 10
   stop_early: True
+  devices: auto
 
 model:
   _target_: src.model.GaussianDensityNetwork

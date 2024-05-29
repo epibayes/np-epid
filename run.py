@@ -31,6 +31,7 @@ def main(cfg=None):
     else:
         callbacks = None
     trainer = L.Trainer(max_epochs=cfg.train.max_epochs, logger=logger,
+                        devices=cfg.train.devices,
                         log_every_n_steps=cfg.train.log_freq, callbacks=callbacks)
 
     trainer.fit(model, datamodule=datamodule)
