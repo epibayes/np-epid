@@ -34,24 +34,35 @@ def lower_tri(values, dim):
         L = torch.zeros(values.shape[0], dim, dim, device=values.device)
         tril_ix = torch.tril_indices(dim, dim)
         L[:, tril_ix[0], tril_ix[1]] = values
+    # special case for non-batched inputs
     else:
         L = torch.zeros(dim, dim, device=values.device)
         tril_ix = torch.tril_indices(dim, dim)
         L[tril_ix[0], tril_ix[1]] = values[0]
     return L
 
+def diag(values):
+    if values.shape[0] > 1:
+        L = torch.diag_embed(values)
+    # special case for non-batched inputs
+    else:
+        L = torch.diag(values[0])
+    return L
+
 def save_results(posterior_params, val_losses, cfg,
                  multidim):
     if multidim:
         mu = posterior_params[0].tolist()
-        sigma = posterior_params[1].tolist()
+        #TODO: fix this
+        L = posterior_params[1]
+        sigma = L @ L.T
+        sdiag = (L @ L.T).diag().tolist()
         lognormal_mean = np.exp(
-            np.array(mu) + np.array(sigma)**2 / 2
+            np.array(mu) + np.array(sdiag) / 2
         )
         print(np.round(lognormal_mean, 3))
         print(np.round(mu, 3))
-        print(np.round(sigma, 3))
-
+        print(np.round(sdiag, 3))
     else:
         mu = posterior_params[0].item()
         sigma = posterior_params[1].item()
@@ -63,9 +74,6 @@ def save_results(posterior_params, val_losses, cfg,
                "n_sample": cfg[cfg.experiment]["n_sample"],
                "seed": cfg[cfg.experiment]["observed_seed"],
                "batch_size": cfg["train"]["batch_size"]}
-            #         "d_model": cfg["model"]["d_model"],
-            #    "weight_decay": cfg["model"]["weight_decay"],
-            #    "mean_field": cfg["model"][""]
     for key in cfg["model"]:
         results["key"] = cfg["model"][key]
     # should probably save seed, etc.

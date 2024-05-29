@@ -4,7 +4,7 @@ from torch.nn import Linear, Dropout, ReLU
 from torch.distributions.normal import Normal
 from torch.distributions.multivariate_normal import MultivariateNormal
 
-from src.utils import lower_tri
+from src.utils import lower_tri, diag
 
 
 class GaussianDensityNetwork(L.LightningModule):
@@ -17,7 +17,7 @@ class GaussianDensityNetwork(L.LightningModule):
         if mean_field:
             n_outputs = self.dim * 2
         else:
-            n_outputs = self.dim + self.dim*(self.dim + 1) / 2
+            n_outputs = self.dim + self.dim*(self.dim + 1) // 2
         self.ff = torch.nn.Sequential(
             Linear(d_x, d_model),
             Dropout(dropout), ReLU(),
@@ -30,15 +30,24 @@ class GaussianDensityNetwork(L.LightningModule):
         # eventually need to save this as an hparam if i am checkpointing models
         self.lr = lr
         self.wd = weight_decay
+        self.mean_field = mean_field
         self.val_losses = []
 
     def forward(self, x):
         assert len(x.shape) == 2
-        # assumes shape (n_batches, d_x)
-        # d_x could be 
         y = self.ff(x)
         mu = y[:, :self.dim]
-        sigma = torch.exp(y[:, self.dim:])
+        sigma = y[:, self.dim:]
+        # case one: unidimensional or mean field
+        if self.dim == 1:
+            sigma = torch.exp(sigma)
+        elif self.mean_field:
+            sigma = diag(torch.exp(sigma))
+        else:
+            sigma = lower_tri(sigma, self.dim)
+            sigma.diagonal(dim1=-2, dim2=-1).copy_(
+                sigma.diagonal(dim1=-2,dim2=-1).exp()
+            )
         return mu, sigma
     
     def training_step(self, batch, batch_idx):
@@ -68,7 +77,7 @@ class GaussianDensityNetwork(L.LightningModule):
             normal = Normal(mu, sigma)
             l = - normal.log_prob(theta)
         else:
-            L = torch.diag_embed(sigma)
+            L = sigma
             mvn = MultivariateNormal(loc=mu, scale_tril=L)
             l = - mvn.log_prob(theta)
 
