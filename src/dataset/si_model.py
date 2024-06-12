@@ -104,6 +104,7 @@ class SIModel(Simulator):
                 hazard += (C * I).sum(1) * beta[Z+1]
                 # TODO: introduce room-level risk
             p = 1 - np.exp(-hazard / self.N)
+            # if someone is not yet infected, simulate transmission event
             A[:,t] = np.where(I, np.ones(self.N), np.random.binomial(1, p, self.N))
             discharge = np.random.binomial(1, self.gamma, size=self.N)
             A[:,t] = np.where(discharge, np.random.binomial(1, self.alpha, self.N), A[:, t])
