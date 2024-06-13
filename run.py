@@ -24,8 +24,7 @@ def main(cfg=None):
     model = instantiate(cfg.model, dataset.d_x, dataset.d_theta)
     wandb.init(reinit=False)
     logger = WandbLogger(project='crkp')
-    # callbacks = [ModelCheckpoint(monitor="val_loss", mode="min")]
-    # callbacks = None
+
     if cfg.train.stop_early:
         callbacks = callbacks=[EarlyStopping(monitor="val_loss", mode="min", patience=cfg.train.patience)]
     else:
