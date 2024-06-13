@@ -42,6 +42,7 @@ def main(cfg=None):
     else:
         multidim = (dataset.d_theta > 1)
         save_results(posterior_params, model.val_losses, cfg, multidim)
+    # TODO: add logic for real data
     wandb.finish()
 
 

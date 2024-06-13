@@ -1,107 +1,90 @@
-import pandas as pd
+import torch
 import numpy as np
+from .simulator import Simulator
+from torch.distributions import Normal
 
-class CRKPTransmissionSimulator:
-    def __init__(self, path, sigma):
-        self.path = path
-        self.fac_tr = None
-        self.floor_tr = None
-        self.room_tr = None
-        self.known = None
-        self.T = None
-        self.sigma = sigma
+class CRKPTransmissionSimulator(Simulator):
+    def __init__(self, prior_mu, prior_sigma, n_sample):
+        self.n_sample = n_sample
+        self.prior_mu = prior_mu
+        self.prior_sigma = prior_sigma
+        self.d_x = 1
 
-    def load_data(self):
-        # traces
-        self.fac_tr = pd.read_csv(
-            f"{self.path}/2019-12-18_facility_trace.csv",
-            index_col=0, header=0,
-            names=np.arange(367)
-            )
-        self.floor_tr  = pd.read_csv(
-            f"{self.path}/2019-12-18_floor_trace.csv",
-            index_col=0, header=0,
-            names=np.arange(367)
-            )
-        self.room_tr = pd.read_csv(
-            f"{self.path}/2019-12-18_room_trace.csv",
-            index_col=0, header=0,
-            names=np.arange(367)
-            )
-        # known events
-        self.known = self.load_known()
-        self.T = self.fac_tr.shape[1]
+        if n_sample is not None:
+            self.data, self.theta = self.simulate_data()
 
-    def load_known(self):
-        # specify fixed points of the simulation
-        # e.g., whoever tests upon intake
-        # or whoever tests for an invasive infection
-        intake_data = pd.read_csv(
-            f"{self.path}/intake_data.csv", index_col=0
-        )
-        tests = pd.read_csv(
-            f"{self.path}/infections.csv", index_col=0
-        )
-        # handle multiple tests same-day per patient: positive result overrules negative
-        # assumption is that false negatives are relatively common compared to false positives
-        # unresolved issue: what if someone gets a negative test after a positive test?
-        tests = tests.reset_index().sort_values(["index", "test_time", "Carbapenem_R"])\
-            .drop_duplicates(["index", "test_time"], keep="last").set_index("index")
+        # TODO: load in facility trace, observed infections (cleaned), and
+        # admission tests
+        self.x_o = None
+        # facility trace
+        self.W = None
+        # tests upon entry
+        self.V = None
+
+    def get_observed_data(self):
+        return self.x_o
+    
+    def simulate_data(self):
+        logbetas = self.sample_logbeta(self.n_sample, seed=5)
+        xs = torch.empty((self.n_sample, self.d_x))
+        for i in range(self.n_sample):
+            rs = 5 * i
+            xs[i] = self.CRKP_simulator(
+                np.array(logbetas[i]), rs
+                ).flatten()
+
+        return xs, logbetas.float()
+    
+    def CRKP_simulator(self, logbeta, seed=None):
+        if seed is not None:
+            np.random.seed(seed)
+        beta = np.exp(logbeta)
+        N, T = self.W.shape
+        beta = np.exp(logbeta)
+        # current admitted status
+        w = np.zeros(N)
+        X = np.empty((N, T))
+        # current status
+        x = np.empty(N); x[:] = np.nan
+        # # current infection status
+        # I = np.zeros(N)
         
-        # generate dataframe of known statuses
-        n = self.fac_tr.shape[0]
-        T = self.fac_tr.shape[1]
-        # this might be more like...known events?
-        known_events = pd.DataFrame(index=intake_data.index, columns=range(T))
         for t in range(T):
-            # statuses upon intake
-            for pid, result in intake_data[intake_data["date"] == t]["crkp"].items():
-                known_events.loc[pid, t] = result
-            # statuses upon test for infection
-            for pid, result in tests[tests["test_time"] == t]["Carbapenem_R"].items():
-                known_events.loc[pid, t] = result
+            # case 1: not present
+            # if absent, set to nan
+            # otherwise, inherit old status
+            X[:, t] = np.where(1 - self.W[:, t], np.nan, x)
+            # case 2: new arrival
+            newly_admitted = self.W[:, t] * (1 - w)
+            # if newly admitted, load test data if available, otherwise default to last status
+            # will this under-report? if someone gets tested a day after arrival
+            X[:, t] = np.where(newly_admitted, self.V[:, t], X[:, t])
+            # ALTERNATIVELY
+            # inherit infection statuses from ground truth
+            # case 3: already admitted and susceptible
+            # randomly model transmission event
+            # otherwise, inherit old status
+            staying = self.W[:, t] * w
+            # who is infected?
+            I = (x == 1).astype(int)
+            hazard = I.sum() * beta * np.ones(N)
+            p = 1 - np.exp(-hazard / N) # not the end of the world to normalize by size of population
+            X[:, t] = np.where(staying * (1 - I), np.random.binomial(1, p, N), X[:, t])
+            x = X[:, t]
+            w = self.W[:, t]
 
-        return known_events
+        return np.nansum(X, axis=0) / N # scaling may speed up training
 
-    def simulate_data(self, N):
-        simulations = []
-        for _ in range(N):
-            # generate beta
-            # lognormal prior
-            beta = np.exp(
-                np.random.normal(scale=self.sigma, size=8)
-            )
-            # can try to calculate summary statistics, here
-            simulations.append(self.simulate(beta))
+    def sample_logbeta(self, N, seed=None):
+        if seed is not None:
+            torch.manual_seed(seed)
+        return torch.normal(self.prior_mu, self.prior_sigma, (N, 1))
+    
 
-    def _simulate(self, beta):
-        transmission_status = pd.DataFrame(index=self.known.index, columns=range(self.T))
-        # TODO: do i want to hard code week 0?
-        transmission_status[0] = self.known[0]
-        y = 1/0
-        for t in range(1, T):
-            status = transmission_status[t-1]
-            facility = self.fac_tr[t-1]
-            admitted = set(facility[facility!= 0])
-            floor = self.floor_tr[t-1]
-            room = self.room_tr[t-1]
-            # requirement: you were susceptible in the previous timestep 
-            # and are not discharged this week
-            susceptible = set(status[status==0].index) & admitted
-            for j in susceptible:
-                hazard_j = 0
-                # should not be facility..
-                hazard_j += status[status == 1].count() * self.beta[0]
-                floor_num = floor.loc[j]
-                hazard_j += status[(status == 1) & (floor == floor_num)].count() \
-                      * self.beta[floor_num]
-                room_num = room.loc[j]
-                hazard_j += status[(status == 1) & (room == room_num)].count() \
-                    * self.beta[-1]
 
-                p_j = 1 - np.exp(-hazard_j)
 
-                Y_j = np.random.binomial(1, p_j)
-                transmission_status.loc[j, t] = Y_j
 
-            # TODO: overwrite this with...known statuses?
+
+# consider taking a rolling mean/sum by week as the relevant observed data
+# do we really care about faithfully capturing daily transmission?
+

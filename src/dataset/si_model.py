@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from .simulator import Simulator
-from torch.distributions import MultivariateNormal, Normal
+from torch.distributions import MultivariateNormal
 
 class SIModel(Simulator):
     def __init__(self, alpha, gamma, beta_true, n_zones,
@@ -52,7 +52,6 @@ class SIModel(Simulator):
     def simulate_data(self):
         logbetas = self.sample_logbeta(self.n_sample, seed=5)
         xs = torch.empty((self.n_sample, self.d_x))
-        # consider vectorizing if this ends up being slow
         for i in range(self.n_sample):
             rs = 5 * i
             xs[i] = self.SI_simulator(
@@ -77,7 +76,6 @@ class SIModel(Simulator):
         return x_o.float()
 
     def SI_simulator(self, logbeta, seed=None):
-        # beta is infection rate
         beta = np.exp(logbeta)
         if len(beta) == 1:
             beta = np.array(((beta[0]), 0))
