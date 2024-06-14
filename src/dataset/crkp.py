@@ -1,10 +1,11 @@
 import torch
 import numpy as np
+import pandas as pd
 from .simulator import Simulator
 from torch.distributions import Normal
 
 class CRKPTransmissionSimulator(Simulator):
-    def __init__(self, prior_mu, prior_sigma, n_sample):
+    def __init__(self, path, prior_mu, prior_sigma, n_sample=None):
         self.n_sample = n_sample
         self.prior_mu = prior_mu
         self.prior_sigma = prior_sigma
@@ -12,14 +13,20 @@ class CRKPTransmissionSimulator(Simulator):
 
         if n_sample is not None:
             self.data, self.theta = self.simulate_data()
-
-        # TODO: load in facility trace, observed infections (cleaned), and
-        # admission tests
-        self.x_o = None
-        # facility trace
-        self.W = None
+        # who is present when?
+        self.W = pd.read_csv(f"{path}/facility_trace.csv", index_col=0).values
         # tests upon entry
-        self.V = None
+
+        self.N, self.T = self.W.shape
+
+        self.V = pd.read_csv(f"{path}/screening.csv", index_col=0).values
+        # observed infections count
+        # consider spinning off into separate function
+        self.x_o = self.load_observed_data(path)
+
+    def load_observed_data(self, path):
+        X = pd.read_csv(f"{path}/infections.csv", index_col=0).sum(0).values
+        return torch.tensor(X).unsqueeze(0) / self.N
 
     def get_observed_data(self):
         return self.x_o
@@ -73,7 +80,8 @@ class CRKPTransmissionSimulator(Simulator):
             x = X[:, t]
             w = self.W[:, t]
 
-        return np.nansum(X, axis=0) / N # scaling may speed up training
+        data = np.nansum(X, axis=0) / N # scaling may speed up training
+        return torch.tensor(data).float()
 
     def sample_logbeta(self, N, seed=None):
         if seed is not None:

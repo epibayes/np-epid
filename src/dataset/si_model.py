@@ -65,9 +65,7 @@ class SIModel(Simulator):
         logbeta_true = torch.log(torch.tensor(self.beta_true))
         x_o = self.SI_simulator(
             np.array(logbeta_true), observed_seed)
-        # return x_o.unsqueeze(0).float()
         if self.summarize:
-            # x_o = x_o.unsqueeze(0)
             x_o = x_o.unsqueeze(0)
         if self.d_theta == 1:
             x_o = x_o.unsqueeze(0)
