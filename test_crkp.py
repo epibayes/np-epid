@@ -5,7 +5,13 @@ path = "/Volumes/umms-esnitkin/Project_KPC_LTACH/Analysis/LTACH_transmission_mod
 prior_mu = -2
 prior_sigma = 1
 summarize = False
-model = CRKPTransmissionSimulator(path, prior_mu, prior_sigma)
+hetero = True
+if hetero:
+    prior_mu = [prior_mu for _ in range(8)]
+    prior_sigma = [prior_mu for _ in range(8)]
+
+model = CRKPTransmissionSimulator(path, prior_mu, prior_sigma,
+                                  heterogeneous=hetero)
 
 x_o = model.get_observed_data()
 # this is dumb
