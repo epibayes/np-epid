@@ -49,6 +49,10 @@ def diag(values):
         L = torch.diag(values[0])
     return L
 
+def contact_matrix(arr):
+    x, y = np.meshgrid(arr, arr)
+    return (x == y).astype(int)
+
 def save_results(posterior_params, val_losses, cfg,
                  multidim):
     if multidim:

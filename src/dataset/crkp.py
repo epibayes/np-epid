@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import pandas as pd
 from .simulator import Simulator
+from ..utils import contact_matrix
 from torch.distributions import MultivariateNormal
 
 class CRKPTransmissionSimulator(Simulator):
@@ -30,8 +31,8 @@ class CRKPTransmissionSimulator(Simulator):
         if self.het:
             assert len(mu) == self.d_theta
             assert len(sigma) == self.d_theta
-            self.prior_mu = torch.tensor(mu)
-            self.prior_sigma = torch.diag(torch.tensor(sigma))
+            self.prior_mu = torch.tensor(mu).float()
+            self.prior_sigma = torch.diag(torch.tensor(sigma)).float()
         else:
             self.prior_mu = mu
             self.prior_sigma = sigma
@@ -52,6 +53,8 @@ class CRKPTransmissionSimulator(Simulator):
                 np.array(logbetas[i]), rs
                 ).flatten()
 
+            # TODO: apply summary here?
+
         return xs, logbetas.float()
     
     def CRKP_simulator(self, logbeta, seed=None):
@@ -63,12 +66,17 @@ class CRKPTransmissionSimulator(Simulator):
         beta = np.exp(logbeta)
         # current admitted status
         w = np.zeros(N)
+        # current floor
+        f = np.zeros(N).astype(int)
+        # current room
+        r = np.zeros(N).astype(int)
         X = np.empty((N, T))
         # current status
         x = np.empty(N); x[:] = np.nan
         # # current infection status
         # I = np.zeros(N)
-        
+        # note that no new infections will be simulated in timestep 0
+        room_count = np.empty(T)
         for t in range(T):
             # case 1: not present
             # if absent, set to nan
@@ -89,21 +97,36 @@ class CRKPTransmissionSimulator(Simulator):
             I = (x == 1).astype(int)
             hazard = I.sum() * beta_0 * np.ones(N)
             if self.het:
-                f = self.F[:, t]
-                fx, fy = np.meshgrid(f, f)
-                # generate contact matrix
-                # TODO: how to handle zeros? multiply against w?
-                fC = (fx == fy).astype(int)
-                hazard += (fC * I).sum(1) * beta[f+1]
-                # r = self.R[:, t]
-
+                # fx, fy = np.meshgrid(f, f)
+                # # generate contact matrix
+                # fC = (fx == fy).astype(int)
+                fC = contact_matrix(f)
+                hazard += (fC * I * w).sum(1) * beta[f]
+                rC = contact_matrix(r)
+                infected_roommates = (rC * I * w).sum(1)
+                # is this statistic "off" by a timestep?
+                room_count[t] = (infected_roommates > 1).sum()
+                hazard += infected_roommates * beta[-1]
             p = 1 - np.exp(-hazard / N) # not the end of the world to normalize by size of population
             X[:, t] = np.where(staying * (1 - I), np.random.binomial(1, p, N), X[:, t])
             x = X[:, t]
             w = self.W[:, t]
+            f = self.F[:, t]
+            r = self.R[:, t]
 
-        data = np.nansum(X, axis=0) / N # scaling may speed up training
-        return torch.tensor(data).float()
+        total_count = np.nansum(X, axis=0)
+
+        if self.het:
+            floor_counts = []
+            for i in range(1,7):
+                # does this work with matrix indexing?
+                floor_count = np.nansum(X * (self.F == i), axis=0)
+                floor_counts.append(floor_count)
+                data = [total_count] + floor_counts + [room_count]
+            return torch.tensor(np.stack(data)).float() / N
+
+        else:
+            return torch.tensor(total_count).float() / N
 
     def sample_logbeta(self, N, seed=None):
         if seed is not None:

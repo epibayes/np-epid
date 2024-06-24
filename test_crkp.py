@@ -8,7 +8,7 @@ summarize = False
 hetero = True
 if hetero:
     prior_mu = [prior_mu for _ in range(8)]
-    prior_sigma = [prior_mu for _ in range(8)]
+    prior_sigma = [prior_sigma for _ in range(8)]
 
 model = CRKPTransmissionSimulator(path, prior_mu, prior_sigma,
                                   heterogeneous=hetero)
