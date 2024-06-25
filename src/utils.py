@@ -57,7 +57,6 @@ def save_results(posterior_params, val_losses, cfg,
                  multidim):
     if multidim:
         mu = posterior_params[0].tolist()
-        #TODO: fix this
         L = posterior_params[1]
         sigma = (L @ L.T).tolist()
         sdiag = (L @ L.T).diag().tolist()

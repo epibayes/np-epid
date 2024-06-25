@@ -7,7 +7,7 @@ from torch.distributions import MultivariateNormal
 
 class CRKPTransmissionSimulator(Simulator):
     def __init__(self, path, prior_mu, prior_sigma, n_sample=None,
-                 observed_seed=None, heterogeneous=True):
+                 summarize=False, observed_seed=None, heterogeneous=True):
         self.n_sample = n_sample
         self.het = heterogeneous
         self.d_theta = 8 if self.het else 1 # six floors, facility and room level transmission rates
@@ -22,10 +22,13 @@ class CRKPTransmissionSimulator(Simulator):
         self.N, self.T = self.W.shape
         self.d_x = self.T
         # observed infections count
+
         self.x_o = self.load_observed_data(path)
 
         if n_sample is not None:
             self.data, self.theta = self.simulate_data()
+
+        self.summarize = summarize
 
     def set_prior(self, mu, sigma):
         if self.het:
@@ -38,11 +41,18 @@ class CRKPTransmissionSimulator(Simulator):
             self.prior_sigma = sigma
 
     def load_observed_data(self, path):
-        X = pd.read_csv(f"{path}/infections.csv", index_col=0).sum(0).values
-        return torch.tensor(X).unsqueeze(0) / self.N
+        with open(f"{path}/observed_data.npy", "rb") as f:
+            x = np.load(f)
+        if self.het:
+            return torch.tensor(x)
+        else:
+            return torch.tensor(x[0,:]).unsqueeze(0)
 
     def get_observed_data(self):
-        return self.x_o.float()
+        if self.summarize:
+            return self.x_o.float().sum(1) # maybe need to unsqueeze...
+        else:
+            return self.x_o.float()
     
     def simulate_data(self):
         logbetas = self.sample_logbeta(self.n_sample, seed=5)
@@ -52,8 +62,6 @@ class CRKPTransmissionSimulator(Simulator):
             xs[i] = self.CRKP_simulator(
                 np.array(logbetas[i]), rs
                 ).flatten()
-
-            # TODO: apply summary here?
 
         return xs, logbetas.float()
     
@@ -74,7 +82,6 @@ class CRKPTransmissionSimulator(Simulator):
         # current status
         x = np.empty(N); x[:] = np.nan
         # # current infection status
-        # I = np.zeros(N)
         # note that no new infections will be simulated in timestep 0
         room_count = np.empty(T)
         for t in range(T):
@@ -85,27 +92,24 @@ class CRKPTransmissionSimulator(Simulator):
             # case 2: new arrival
             newly_admitted = self.W[:, t] * (1 - w)
             # if newly admitted, load test data if available, otherwise default to last status
-            # will this under-report? if someone gets tested a day after arrival
             X[:, t] = np.where(newly_admitted, self.V[:, t], X[:, t])
-            # ALTERNATIVELY
-            # inherit infection statuses from ground truth
             # case 3: already admitted and susceptible
             # randomly model transmission event
             # otherwise, inherit old status
             staying = self.W[:, t] * w
-            # who is infected?
+            # who was infected at the last timestep?
             I = (x == 1).astype(int)
+            assert I[w == 0].sum() == 0
             hazard = I.sum() * beta_0 * np.ones(N)
             if self.het:
-                # fx, fy = np.meshgrid(f, f)
                 # # generate contact matrix
-                # fC = (fx == fy).astype(int)
                 fC = contact_matrix(f)
-                hazard += (fC * I * w).sum(1) * beta[f]
+                # guarantee that there are no infecteds who aren't present
+                # how many infected floormates?
+                hazard += (fC * I).sum(1) * beta[f]
                 rC = contact_matrix(r)
-                infected_roommates = (rC * I * w).sum(1)
-                # is this statistic "off" by a timestep?
-                room_count[t] = (infected_roommates > 1).sum()
+                infected_roommates = (rC * I).sum(1)
+                room_count[t] = (infected_roommates > 1).sum() / 2
                 hazard += infected_roommates * beta[-1]
             p = 1 - np.exp(-hazard / N) # not the end of the world to normalize by size of population
             X[:, t] = np.where(staying * (1 - I), np.random.binomial(1, p, N), X[:, t])
@@ -122,11 +126,14 @@ class CRKPTransmissionSimulator(Simulator):
                 # does this work with matrix indexing?
                 floor_count = np.nansum(X * (self.F == i), axis=0)
                 floor_counts.append(floor_count)
-                data = [total_count] + floor_counts + [room_count]
-            return torch.tensor(np.stack(data)).float() / N
-
+                stats = [total_count] + floor_counts + [room_count]
+            data = torch.tensor(np.stack(stats)).float()
         else:
-            return torch.tensor(total_count).float() / N
+            data =  torch.tensor(total_count).float()
+        if self.summarize:
+            return data.sum(1)
+        else:
+            return data
 
     def sample_logbeta(self, N, seed=None):
         if seed is not None:
