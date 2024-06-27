@@ -59,13 +59,11 @@ class SIModel(Simulator):
         logbeta_true = torch.log(torch.tensor(self.beta_true))
         x_o = self.SI_simulator(
             np.array(logbeta_true), observed_seed)
-        # this is a clusterf*ck
         if self.summarize:
             x_o = x_o.unsqueeze(0)
-        else:
-            if self.het:
-                x_o = x_o.unsqueeze(0)
         if not self.het:
+            x_o = x_o.unsqueeze(0)
+        if self.flatten and self.het:
             x_o = x_o.unsqueeze(0)
         return x_o.float()
 

@@ -39,7 +39,7 @@ def abc_rejection_sampler(S, epsilon, prior_sampler, simulator,
 def accept_sample(x, x_o, epsilon, summarize, lam):
     # error should have dimension (d_theta, d_x)
     if summarize:
-        x_o = x_o[:, 0]
+        x_o = x_o[0]
     v = np.array(x - x_o)
     if lam is not None:
         v = v * lam.reshape(-1, 1)

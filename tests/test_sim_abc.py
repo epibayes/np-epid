@@ -55,7 +55,7 @@ def test_abc_sim_heterog_summ():
 def _test(beta_true, prior_mu, prior_sigma, het, summarize, flatten):
     si_model = SIModel(alpha, gamma, beta_true, het, 
             prior_mu, prior_sigma,
-            N, T, summarize, observed_seed,
+            N, T, observed_seed=observed_seed,
             summarize=summarize,
             flatten=flatten)
 
