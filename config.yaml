@@ -1,7 +1,7 @@
-experiment: crkp-het
+experiment:
 
 simulator: &simulator
-  n_sample: 256
+  n_sample: 1000
   observed_seed: 5
 
 
@@ -43,6 +43,7 @@ si-model-het:
   <<: *si-model
   beta_true: [0.075, 0.3, 0.2, 0.4, .2, .3, .25, .5]
   prior_mu: [-3, -2, -2, -2, -2, -2, -2, -1]
+  prior_sigma: [1, 1, 1, 1, 1, 1, 1, 1]
   heterogeneous: True
   observed_seed: 31
 
@@ -67,7 +68,7 @@ train:
   batch_size:
   # random seed for train-validation split
   seed: 11
-  max_epochs: 50 # 500
+  max_epochs: 500
   log_freq: 4
   patience: 10
   stop_early: True
@@ -79,7 +80,7 @@ model:
   lr: 0.001
   dropout: 0.0
   weight_decay: 0.0
-  mean_field: True
+  mean_field: False
 
 hydra:
   job:

@@ -60,8 +60,6 @@ class SIModel(Simulator):
         x_o = self.SI_simulator(
             np.array(logbeta_true), observed_seed)
         # this is a clusterf*ck
-        if self.flatten:
-            x_o = x_o.flatten()
         if self.summarize:
             x_o = x_o.unsqueeze(0)
         else:
@@ -95,7 +93,11 @@ class SIModel(Simulator):
                 hazard += (fC * I).sum(1) * beta[F+1]
                 infected_roommates = (rC * I).sum(1)
                 # is there a better summary statistic?
-                room_infect_density[t] = infected_roommates[infected_roommates > 0].mean()
+                # TODO: this is a major bug!
+                if infected_roommates.max() == 0:
+                    room_infect_density[t] = 1
+                else:
+                    room_infect_density[t] = infected_roommates[infected_roommates > 0].mean()
                 hazard += infected_roommates * beta[-1]
             p = 1 - np.exp(-hazard / self.N)
             # if someone is not yet infected, simulate transmission event

@@ -2,7 +2,6 @@ import hydra
 import wandb
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
-from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from hydra.utils import instantiate
 from src.utils import DataModule, save_results
