@@ -2,11 +2,13 @@ import torch
 import numpy as np
 from .simulator import Simulator
 from torch.distributions import MultivariateNormal
+from ..utils import contact_matrix
 
 class SIModel(Simulator):
-    def __init__(self, alpha, gamma, beta_true, n_zones,
-                 prior_mu, prior_sigma,  N, T, summarize,
-                 observed_seed, room=False, n_sample=None):
+    def __init__(self, alpha, gamma, beta_true, heterogeneous,
+                 prior_mu, prior_sigma,  N, T, summarize=False,
+                 observed_seed=None, room=False, n_sample=None,
+                 flatten=True):
         self.alpha = alpha # baseline proportion infected in pop
         self.gamma = gamma # discharge rate
         if np.isscalar(beta_true):
@@ -15,11 +17,12 @@ class SIModel(Simulator):
             self.beta_true = beta_true
         self.N = N
         self.T = T
-        self.n_zones = n_zones
+        self.het = heterogeneous
         self.room = room
-        self.d_theta = 1 if n_zones == 1 else 1 + n_zones + int(room)
+        self.d_theta = 8 if self.het else 1
         assert self.d_theta == len(self.beta_true)
         self.set_prior(prior_mu, prior_sigma)
+        self.flatten = flatten
         if summarize: 
             self.d_x = self.d_theta
         else:
@@ -35,19 +38,10 @@ class SIModel(Simulator):
             self.prior_mu = mu
             self.prior_sigma = sigma
             return
-        if np.isscalar(mu):
-            prior_mu = torch.tensor([mu for _ in range(self.d_theta)])
         else:
-            prior_mu = torch.tensor(mu)
-        if np.isscalar(sigma):
-            diag = torch.tensor([sigma for _ in range(self.d_theta)])
-        else:
-            diag = torch.tensor(sigma)
-        prior_sigma = torch.diag(diag)
-        assert prior_mu.shape[0] == len(self.beta_true)
-        assert diag.shape[0] == len(self.beta_true)
-        self.prior_mu = prior_mu.float()
-        self.prior_sigma = prior_sigma.float()
+            self.prior_mu = torch.tensor(mu).float()
+            self.prior_sigma = torch.diag(torch.tensor(sigma)).float()
+            return
 
     def simulate_data(self):
         logbetas = self.sample_logbeta(self.n_sample, seed=5)
@@ -65,40 +59,44 @@ class SIModel(Simulator):
         logbeta_true = torch.log(torch.tensor(self.beta_true))
         x_o = self.SI_simulator(
             np.array(logbeta_true), observed_seed)
+        # this is a clusterf*ck
+        if self.flatten:
+            x_o = x_o.flatten()
         if self.summarize:
             x_o = x_o.unsqueeze(0)
-        if self.d_theta == 1:
+        else:
+            if self.het:
+                x_o = x_o.unsqueeze(0)
+        if not self.het:
             x_o = x_o.unsqueeze(0)
-        if not (self.summarize or (self.d_theta == 1)):
-            x_o = x_o.flatten().unsqueeze(0)
         return x_o.float()
 
     def SI_simulator(self, logbeta, seed=None):
         beta = np.exp(logbeta)
         if len(beta) == 1:
-            beta = np.array(((beta[0]), 0))
-        assert len(beta) == self.n_zones + 1
+            beta = np.array(((beta[0],)))
+        assert len(beta) == self.d_theta
         if seed is not None:
             np.random.seed(seed)
         A  = np.empty((self.N, self.T))
         # assign zones at random
-        Z = np.arange(self.N) % self.n_zones
-        # floor assignment: similar principle; 
-        # just make sure floor numbers are a multiple of n_zones
-        # Z = np.random.choice(np.arange(self.n_zones), self.N)
+        F = np.arange(self.N) % 6 # does this need to be random?
+        R = np.arange(self.N) % 60 # idk if this will work
         # seed initial infections
         A[:, 0] = np.random.binomial(1, self.alpha, self.N)
-
+        room_infect_density = np.zeros(self.T)
+        fC = contact_matrix(F)
+        rC = contact_matrix(R)
         for t in range(1, self.T):
             I = A[:, t-1]
             # components dependent on individual covariates
             hazard = I.sum() * beta[0] * np.ones(self.N)
-            if self.n_zones > 1:
-                Zx, Zy = np.meshgrid(Z, Z)
-                # generate contact matrix: each row i indicates who shares a zone with patient i
-                C = (Zx == Zy).astype(int)
-                hazard += (C * I).sum(1) * beta[Z+1]
-                # TODO: introduce room-level risk
+            if self.het:
+                hazard += (fC * I).sum(1) * beta[F+1]
+                infected_roommates = (rC * I).sum(1)
+                # is there a better summary statistic?
+                room_infect_density[t] = infected_roommates[infected_roommates > 0].mean()
+                hazard += infected_roommates * beta[-1]
             p = 1 - np.exp(-hazard / self.N)
             # if someone is not yet infected, simulate transmission event
             A[:,t] = np.where(I, np.ones(self.N), np.random.binomial(1, p, self.N))
@@ -108,11 +106,19 @@ class SIModel(Simulator):
         A = torch.tensor(A).float() # make it all float for good measure
         # is it as simple as offsetting by first element of A?
         w = None if self.summarize else 0
-        if self.n_zones == 1:
-            return A.mean(w)
+        total_count = A.mean(w)
+        if self.het:
+            floor_counts = [A[F == i].mean(w) for i in range(6)]
+            if self.summarize:
+                room_infect_density = room_infect_density.mean()
+            data =  torch.stack([total_count] + floor_counts + [torch.tensor(room_infect_density)])
         else:
-            zone_counts = [A[Z == i].mean(w) for i in range(self.n_zones)]
-            return torch.stack([A.mean(w)] + zone_counts)
+            data = total_count
+            
+        if self.flatten:
+            data = data.flatten()
+        
+        return data
     
     def sample_logbeta(self, N, seed=None):
         if seed is not None:

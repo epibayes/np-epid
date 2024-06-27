@@ -7,7 +7,8 @@ from torch.distributions import MultivariateNormal
 
 class CRKPTransmissionSimulator(Simulator):
     def __init__(self, path, prior_mu, prior_sigma, n_sample=None,
-                 summarize=False, observed_seed=None, heterogeneous=True):
+                 observed_seed=None, heterogeneous=True,
+                 flatten=False, scale=True):
         self.n_sample = n_sample
         self.het = heterogeneous
         self.d_theta = 8 if self.het else 1 # six floors, facility and room level transmission rates
@@ -20,15 +21,16 @@ class CRKPTransmissionSimulator(Simulator):
         self.F = pd.read_csv(f"{path}/floor_trace.csv", index_col=0).values
         self.R = pd.read_csv(f"{path}/room_trace.csv", index_col=0).values
         self.N, self.T = self.W.shape
-        self.d_x = self.T
-        # observed infections count
-
-        self.x_o = self.load_observed_data(path)
-
+        self.d_x = self.T * 8 if self.het else self.T
+        self.flatten = flatten # only set this false for ABC comparison
+        self.scale = scale
+        self.lam = None
         if n_sample is not None:
             self.data, self.theta = self.simulate_data()
 
-        self.summarize = summarize
+        self.x_o = self.load_observed_data(path)
+
+        
 
     def set_prior(self, mu, sigma):
         if self.het:
@@ -49,10 +51,15 @@ class CRKPTransmissionSimulator(Simulator):
             return torch.tensor(x[0,:]).unsqueeze(0)
 
     def get_observed_data(self):
-        if self.summarize:
-            return self.x_o.float().sum(1) # maybe need to unsqueeze...
+         # TODO: scale that sucka
+        if self.scale:
+            x_o  = self.x_o / self.lam.unsqueeze(1)
         else:
-            return self.x_o.float()
+            x_o = self.x_o
+        if self.flatten:
+            return x_o.float().flatten().unsqueeze(0)
+        else:
+            return x_o.float()
     
     def simulate_data(self):
         logbetas = self.sample_logbeta(self.n_sample, seed=5)
@@ -62,6 +69,13 @@ class CRKPTransmissionSimulator(Simulator):
             xs[i] = self.CRKP_simulator(
                 np.array(logbetas[i]), rs
                 ).flatten()
+            
+        if self.scale:
+            X = xs.unflatten(1,(self.d_theta, self.T))
+            self.lam = X.mean(dim=(0,2))
+            X = X / self.lam.unsqueeze(1)
+            xs = X.flatten(start_dim=1)
+
 
         return xs, logbetas.float()
     
@@ -130,10 +144,11 @@ class CRKPTransmissionSimulator(Simulator):
             data = torch.tensor(np.stack(stats)).float()
         else:
             data =  torch.tensor(total_count).float()
-        if self.summarize:
-            return data.sum(1)
-        else:
-            return data
+
+        # if self.flatten:
+        #     data = data.flatten()
+
+        return data
 
     def sample_logbeta(self, N, seed=None):
         if seed is not None:
