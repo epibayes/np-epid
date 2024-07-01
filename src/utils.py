@@ -78,8 +78,8 @@ def save_results(posterior_params, val_losses, cfg,
                "seed": cfg[cfg.experiment]["observed_seed"],
                "batch_size": cfg["train"]["batch_size"],
                "N": cfg[cfg.experiment]["N"],
-               "prior_mu": cfg[cfg.experiment]["prior_mu"],
-               "prior_sigma": cfg[cfg.experiment]["prior_sigma"]}
+               "prior_mu": list(cfg[cfg.experiment]["prior_mu"]),
+               "prior_sigma": list(cfg[cfg.experiment]["prior_sigma"])}
     for key in cfg["model"]:
         results[key] = cfg["model"][key]
     # should probably save seed, etc.
