@@ -19,7 +19,7 @@ class SIModel(Simulator):
         self.T = T
         self.het = heterogeneous
         self.room = room
-        self.d_theta = 8 if self.het else 1
+        self.d_theta = 7 if self.het else 1
         assert self.d_theta == len(self.beta_true)
         self.set_prior(prior_mu, prior_sigma)
         self.flatten = flatten
@@ -76,11 +76,11 @@ class SIModel(Simulator):
             np.random.seed(seed)
         A  = np.empty((self.N, self.T))
         # assign zones at random
-        F = np.arange(self.N) % 6 # does this need to be random?
-        R = np.arange(self.N) % 60 # idk if this will work
+        F = np.arange(self.N) % 5 # does this need to be random?
+        R = np.arange(self.N) % (self.N // 2) # N should be divisible by 10
         # seed initial infections
         A[:, 0] = np.random.binomial(1, self.alpha, self.N)
-        room_infect_density = np.zeros(self.T)
+        room_infect_density = np.ones(self.T)
         fC = contact_matrix(F)
         rC = contact_matrix(R)
         for t in range(1, self.T):
@@ -108,7 +108,7 @@ class SIModel(Simulator):
         w = None if self.summarize else 0
         total_count = A.mean(w)
         if self.het:
-            floor_counts = [A[F == i].mean(w) for i in range(6)]
+            floor_counts = [A[F == i].mean(w) for i in range(5)]
             if self.summarize:
                 room_infect_density = room_infect_density.mean()
             data =  torch.stack([total_count] + floor_counts + [torch.tensor(room_infect_density)])

@@ -41,9 +41,9 @@ si-model: &si-model
 
 si-model-het:
   <<: *si-model
-  beta_true: [0.075, 0.3, 0.2, 0.4, .2, .3, .25, .5]
-  prior_mu: [-3, -2, -2, -2, -2, -2, -2, -1]
-  prior_sigma: [1, 1, 1, 1, 1, 1, 1, 1]
+  beta_true: [0.05, .1, .2, .3, .4, .5, 5]
+  prior_mu: [-3, -1.5, -1.5, -1.5, -1.5, -1.5, 1]
+  prior_sigma: [1, 1, 1, 1, 1, 1, 1]
   heterogeneous: True
   observed_seed: 31
 
@@ -76,7 +76,7 @@ train:
 
 model:
   _target_: src.model.GaussianDensityNetwork
-  d_model: 16
+  d_model: 32
   lr: 0.001
   dropout: 0.0
   weight_decay: 0.0
