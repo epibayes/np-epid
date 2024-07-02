@@ -38,6 +38,7 @@ si-model: &si-model
   summarize: False
   observed_seed: 29
   heterogeneous: False
+  pi:
 
 si-model-het:
   <<: *si-model
@@ -47,6 +48,13 @@ si-model-het:
   heterogeneous: True
   observed_seed: 31
   N: 300
+
+si-model-id:
+  <<: *si-model
+  beta_true: [0.15, 0, 0, 0, 0, 0, 0]
+  prior_mu: [-3, -1.5, -1.5, -1.5, -1.5, -1.5, 1] #[-4, -4, -4, -4, -4, -4, -4] # [-3, -3, -3, -3, -3, -3, -3]
+  prior_sigma: [2, 2, 2, 2, 2, 2, 2] # [1, 1, 1, 1, 1, 1, 1]
+  heterogeneous: True
 
 crkp: &crkp
   <<: *simulator
