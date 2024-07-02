@@ -36,8 +36,28 @@ def abc_rejection_sampler(S, epsilon, prior_sampler, simulator,
     print(f"Total number of attempts: {attempts:,}")
     return np.array(samples), errors
 
+
+def abc_rejection_sampler2(S, prior_sampler, simulator, 
+                          x_o, summarize=False,
+                          error_scaling = None):
+        # S: total number of particles
+    samples = np.empty(S)
+    # x_o is shape (d_theta, d_x)
+    errors = np.full(S, -1e3)
+    seed = 0
+    start_time = timer()
+    for s in range(S):
+        theta = np.array(prior_sampler())[0]
+        x = simulator(theta, seed=seed)
+        # this is gimmicky
+        _, error = accept_sample(x, x_o, 1e5, summarize, error_scaling)
+        samples[s] = theta
+        errors[s] = error
+        seed += 1
+    return samples, errors
+    
+
 def accept_sample(x, x_o, epsilon, summarize, lam):
-    # error should have dimension (d_theta, d_x)
     if summarize:
         x_o = x_o[0]
     v = np.array(x - x_o)
