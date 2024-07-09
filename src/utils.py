@@ -66,20 +66,24 @@ def save_results(posterior_params, val_losses, cfg,
         print(np.round(lognormal_mean, 3))
         print(np.round(mu, 3))
         print(np.round(sdiag, 3))
+        prior_mu = list(cfg[cfg.experiment]["prior_mu"])
+        prior_sigma = list(cfg[cfg.experiment]["prior_sigma"])
     else:
         mu = posterior_params[0].item()
         sigma = posterior_params[1].item()
         print(np.round(np.exp(mu + sigma**2 / 2), 3))
         print(np.round(mu, 3))
         print(np.round(sigma, 3))
+        prior_mu = cfg[cfg.experiment]["prior_mu"]
+        prior_sigma = cfg[cfg.experiment]["prior_sigma"]
     results = {"mu": mu, "sigma":sigma,
                "val_loss": val_losses[-1],
                "n_sample": cfg[cfg.experiment]["n_sample"],
                "seed": cfg[cfg.experiment]["observed_seed"],
                "batch_size": cfg["train"]["batch_size"],
                "N": cfg[cfg.experiment]["N"],
-               "prior_mu": list(cfg[cfg.experiment]["prior_mu"]),
-               "prior_sigma": list(cfg[cfg.experiment]["prior_sigma"])}
+               "prior_mu": prior_mu,
+               "prior_sigma": prior_sigma}
     for key in cfg["model"]:
         results[key] = cfg["model"][key]
     # should probably save seed, etc.
