@@ -8,3 +8,4 @@ lightning_logs
 multirun
 .ipynb_checkpoints
 experiments.md
+*.csv

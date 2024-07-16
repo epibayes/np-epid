@@ -39,6 +39,7 @@ si-model: &si-model
   observed_seed: 29
   heterogeneous: False
   pi:
+  eta_true: 
 
 si-model-het:
   <<: *si-model
@@ -55,6 +56,10 @@ si-model-id:
   prior_mu: [-3, -1.5, -1.5, -1.5, -1.5, -1.5, 1] #[-4, -4, -4, -4, -4, -4, -4] # [-3, -3, -3, -3, -3, -3, -3]
   prior_sigma: [2, 2, 2, 2, 2, 2, 2] # [1, 1, 1, 1, 1, 1, 1]
   heterogeneous: True
+
+si-model-partial:
+  <<: *si-model # change this to het eventually
+  eta_true: 0.5
 
 crkp: &crkp
   <<: *simulator

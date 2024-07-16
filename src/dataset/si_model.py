@@ -9,7 +9,7 @@ class SIModel(Simulator):
     def __init__(self, alpha, gamma, beta_true, heterogeneous,
                  prior_mu, prior_sigma,  N, T, summarize=False,
                  observed_seed=None, room=False, n_sample=None,
-                 flatten=True, pi=None):
+                 flatten=True, pi=None, eta_true = 1):
         self.alpha = alpha # baseline proportion infected in pop
         self.gamma = gamma # discharge rate
         if np.isscalar(beta_true):
@@ -24,6 +24,7 @@ class SIModel(Simulator):
             assert len(self.beta_true) == len(self.pi)
         else:
             self.pi = pi
+        self.eta_true = eta_true
         self.N = N
         self.T = T
         self.het = heterogeneous
@@ -36,6 +37,8 @@ class SIModel(Simulator):
             self.d_x = self.d_theta
         else:
             self.d_x = T * self.d_theta
+        if eta_true < 1:
+            self.d_theta += 1
         self.summarize = summarize
         self.n_sample = n_sample
         if n_sample is not None:
@@ -54,6 +57,9 @@ class SIModel(Simulator):
 
     def simulate_data(self):
         logbetas = self.sample_logbeta(self.n_sample, seed=5)
+        # do something stupid and hacky, here
+        if self.eta == 1:
+            pass
         xs = torch.empty((self.n_sample, self.d_x))
         for i in range(self.n_sample):
             rs = 5 * i
@@ -65,9 +71,11 @@ class SIModel(Simulator):
     def get_observed_data(self, observed_seed=None):
         if observed_seed is None:
             observed_seed = self.obs
-        logbeta_true = torch.log(torch.tensor(self.beta_true))
+        # TODO: this is problematic!
+        logbeta_true = np.log(np.array(self.beta_true))
         x_o = self.SI_simulator(
-            np.array(logbeta_true), observed_seed)
+            np.array(logbeta_true), observed_seed, self.eta_true
+            )
         if self.summarize:
             x_o = x_o.unsqueeze(0)
         if not self.het:
@@ -76,84 +84,7 @@ class SIModel(Simulator):
             x_o = x_o.unsqueeze(0)
         return x_o.float()
 
-    def SI_simulator(self, logbeta, seed=None):
-        beta = np.exp(logbeta)
-        if len(beta) == 1:
-            beta = np.array(((beta[0],)))
-        assert len(beta) == self.d_theta
-        if self.pi is not None:
-            beta = beta * self.pi
-        if seed is not None:
-            np.random.seed(seed)
-        X  = np.empty((self.N, self.T))
-        # assign zones at random
-        F = np.arange(self.N) % 5 # does this need to be random?
-        R = np.arange(self.N) % (self.N // 2) # N should be divisible by 10
-        # seed initial infections
-        X[:, 0] = np.random.binomial(1, self.alpha, self.N)
-        room_infect_density = np.ones(self.T)
-        fC = contact_matrix(F)
-        rC = contact_matrix(R)
-        for t in range(1, self.T):
-            I = X[:, t-1]
-            # components dependent on individual covariates
-            hazard = I.sum() * beta[0] * np.ones(self.N)
-            if self.het:
-                hazard += (fC * I).sum(1) * beta[F+1]
-                infected_roommates = (rC * I).sum(1)
-                if infected_roommates.max() == 0:
-                    room_infect_density[t] = 1
-                else:
-                    room_infect_density[t] = infected_roommates[infected_roommates > 0].mean()
-                hazard += infected_roommates * beta[-1]
-            p = 1 - np.exp(-hazard / self.N)
-            new_infections = np.random.binomial(1, p, self.N)
-            X[:, t] = np.where(I, np.ones(self.N), new_infections)
-            # if someone is not yet infected, simulate transmission event
-            discharge = np.random.binomial(1, self.gamma, size=self.N)
-            screening = np.random.binomial(1, self.alpha, self.N)
-            X[:, t] = np.where(discharge, screening, X[:, t])
-
-        X = torch.tensor(X).float() # make it all float for good measure
-        # is it as simple as offsetting by first element of A?
-        w = None if self.summarize else 0
-        total_count = X.mean(w)
-        if self.het:
-            floor_counts = [X[F == i].mean(w) for i in range(5)]
-            if self.summarize:
-                room_infect_density = room_infect_density.mean()
-            data =  torch.stack([total_count] + floor_counts + [torch.tensor(room_infect_density)])
-        else:
-            data = total_count
-            
-        if self.flatten:
-            data = data.flatten()
-        
-        return data
-    
-    def sample_logbeta(self, N, seed=None):
-        if seed is not None:
-            torch.manual_seed(seed)
-        if self.d_theta == 1:
-            log_beta = torch.normal(self.prior_mu, self.prior_sigma, (N, 1))
-        else:
-            mvn = MultivariateNormal(self.prior_mu, self.prior_sigma)
-            log_beta = mvn.sample((N,))
-        return log_beta
-    
-class SIModelPartialObs(SIModel):
-    def __init__(self, alpha, gamma, beta_true, heterogeneous,
-                 prior_mu, prior_sigma,  N, T, summarize=False,
-                 observed_seed=None, room=False, n_sample=None,
-                 flatten=True, pi=None, eta = 1):
-        super().__init__(alpha, gamma, beta_true, heterogeneous,
-                 prior_mu, prior_sigma,  N, T, summarize=False,
-                 observed_seed=None, room=False, n_sample=None,
-                 flatten=True, pi=None)
-        self.eta = eta
-
-
-    def SI_simulator(self, logbeta, seed=None):
+    def SI_simulator(self, logbeta, seed=None, eta=1):
         beta = np.exp(logbeta)
         if len(beta) == 1:
             beta = np.array(((beta[0],)))
@@ -165,10 +96,10 @@ class SIModelPartialObs(SIModel):
         X  = np.empty((self.N, self.T))
         Y = np.empty((self.N, self.T))
         # assign zones at random
-        F = np.arange(self.N) % 5
+        F = np.arange(self.N) % 5 # does this need to be random?
         R = np.arange(self.N) % (self.N // 2) # N should be divisible by 10
         # seed initial infections
-        X[:, 0] = binomial(1, self.alpha, self.N)
+        X[:, 0] = np.random.binomial(1, self.alpha, self.N)
         Y[:, 0] = X[:, 0]
         room_infect_density = np.ones(self.T)
         fC = contact_matrix(F)
@@ -188,26 +119,25 @@ class SIModelPartialObs(SIModel):
                 else:
                     room_infect_density[t] = roommates_obs[roommates_obs > 0].mean()
             p = 1 - np.exp(-hazard / self.N)
-            # if someone is not yet infected, simulate transmission event
-            new_infections = binomial(1, p, self.N)
-            # observed_infections = np.where(new_infections, binomial(1, self.eta, self.N), 0)
-            X[:,t] = np.where(I, np.ones(self.N), new_infections)
+            new_infections = np.random.binomial(1, p, self.N)
+            X[:, t] = np.where(I, np.ones(self.N), new_infections)
+            if eta == 1:
+                observed = np.ones(self.N)
+            else:
+                observed = binomial(1, eta, self.N)
             Y[:, t] = np.where(
                 X[:, t] * (1 - Y[:, t-1]),
-                binomial(1, self.eta, self.N),
+                observed,
                 Y[:, t-1]
-            )   
-            discharge = binomial(1, self.gamma, size=self.N)
-            screening = binomial(1, self.alpha, self.N)
-            X[:,t] = np.where(discharge, screening, X[:, t])
+            ) 
+            # if someone is not yet infected, simulate transmission event
+            discharge = np.random.binomial(1, self.gamma, size=self.N)
+            screening = np.random.binomial(1, self.alpha, self.N)
+            X[:, t] = np.where(discharge, screening, X[:, t])
             Y[:, t] = np.where(discharge, screening, Y[:, t])
 
-        # sanity check: this should be equal when eta = 1
-        if self.eta == 1:
-                assert (Y == X).all()
-        assert (Y <= X).all()
-        Y = torch.tensor(Y).float()
-        # is it as simple as offsetting by first element of X?
+        Y = torch.tensor(Y).float() # make it all float for good measure
+        # is it as simple as offsetting by first element of A?
         w = None if self.summarize else 0
         total_count = Y.mean(w)
         if self.het:
@@ -222,3 +152,24 @@ class SIModelPartialObs(SIModel):
             data = data.flatten()
         
         return data
+    
+    def sample_parameters(self, N, seed=None):
+        if self.eta_true == 1:
+            return 
+    
+    def sample_logbeta(self, N, seed=None):
+        if seed is not None:
+            torch.manual_seed(seed)
+        if self.het:
+            mvn = MultivariateNormal(self.prior_mu, self.prior_sigma)
+            log_beta = mvn.sample((N,))
+        else:
+            log_beta = torch.normal(self.prior_mu, self.prior_sigma, (N, 1))
+            
+        if self.eta_true < 1:
+            # TODO: supply parameters on range of random uniform
+            eta = torch.rand((N, 1))
+            
+            log_beta = torch.cat((log_beta, eta), 1)
+
+        return log_beta
