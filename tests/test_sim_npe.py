@@ -9,6 +9,9 @@ def test_npe_sim_homog():
 
 def test_npe_sim_heterog():
     _test("si-model-het")
+    
+def test_npe_sim_partial():
+    _test("si-model-partial")
 
         
         

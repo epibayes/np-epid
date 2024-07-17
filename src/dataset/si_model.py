@@ -75,13 +75,11 @@ class SIModel(Simulator):
                 etas[i]
             ).flatten()
 
-        return xs, logbetas.float()
+        return xs, thetas.float()
     
     def get_observed_data(self, observed_seed=None):
         if observed_seed is None:
             observed_seed = self.obs
-        # TODO: this is problematic!
-        # oh wait, is this?
         logbeta_true = np.log(np.array(self.beta_true))
         x_o = self.SI_simulator(
             np.array(logbeta_true), observed_seed, self.eta_true
@@ -98,7 +96,8 @@ class SIModel(Simulator):
         beta = np.exp(logbeta)
         if len(beta) == 1:
             beta = np.array(((beta[0],)))
-        assert len(beta) == self.d_theta
+            
+        assert len(beta) + int(self.eta_true < 1) == self.d_theta
         if self.pi is not None:
             beta = beta * self.pi
         if seed is not None:
