@@ -39,7 +39,7 @@ si-model: &si-model
   observed_seed: 29
   heterogeneous: False
   pi:
-  eta_true: 
+  eta_true:
 
 si-model-het:
   <<: *si-model

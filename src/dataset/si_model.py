@@ -9,7 +9,7 @@ class SIModel(Simulator):
     def __init__(self, alpha, gamma, beta_true, heterogeneous,
                  prior_mu, prior_sigma,  N, T, summarize=False,
                  observed_seed=None, room=False, n_sample=None,
-                 flatten=True, pi=None, eta_true = 1):
+                 flatten=True, pi=None, eta_true = None):
         self.alpha = alpha # baseline proportion infected in pop
         self.gamma = gamma # discharge rate
         if np.isscalar(beta_true):
@@ -24,7 +24,10 @@ class SIModel(Simulator):
             assert len(self.beta_true) == len(self.pi)
         else:
             self.pi = pi
-        self.eta_true = eta_true
+        if eta_true is None:
+            self.eta_true = 1
+        else:
+            self.eta_true = eta_true
         self.N = N
         self.T = T
         self.het = heterogeneous
@@ -37,7 +40,7 @@ class SIModel(Simulator):
             self.d_x = self.d_theta
         else:
             self.d_x = T * self.d_theta
-        if eta_true < 1:
+        if self.eta_true < 1:
             self.d_theta += 1
         self.summarize = summarize
         self.n_sample = n_sample
@@ -56,15 +59,21 @@ class SIModel(Simulator):
             return
 
     def simulate_data(self):
-        logbetas = self.sample_logbeta(self.n_sample, seed=5)
-        # do something stupid and hacky, here
-        if self.eta == 1:
-            pass
+        thetas = self.sample_parameters(self.n_sample, seed=5)
+        if self.eta_true == 1:
+            logbetas = thetas
+            etas = np.ones(self.n_sample)
+        else:
+            logbetas = thetas[:, :-1]
+            etas = np.array(thetas[:, -1])
         xs = torch.empty((self.n_sample, self.d_x))
         for i in range(self.n_sample):
-            rs = 5 * i
+            random_seed = 5 * i
             xs[i] = self.SI_simulator(
-                np.array(logbetas[i]), rs).flatten()
+                np.array(logbetas[i]),
+                random_seed,
+                etas[i]
+            ).flatten()
 
         return xs, logbetas.float()
     
@@ -72,6 +81,7 @@ class SIModel(Simulator):
         if observed_seed is None:
             observed_seed = self.obs
         # TODO: this is problematic!
+        # oh wait, is this?
         logbeta_true = np.log(np.array(self.beta_true))
         x_o = self.SI_simulator(
             np.array(logbeta_true), observed_seed, self.eta_true
@@ -154,8 +164,13 @@ class SIModel(Simulator):
         return data
     
     def sample_parameters(self, N, seed=None):
+        logbeta = self.sample_logbeta(N, seed=None)
         if self.eta_true == 1:
-            return 
+            return logbeta
+            # TODO: supply parameters on range of random uniform
+        else:
+            eta = torch.rand((N, 1))
+            return torch.cat((logbeta, eta), 1)
     
     def sample_logbeta(self, N, seed=None):
         if seed is not None:
@@ -165,11 +180,4 @@ class SIModel(Simulator):
             log_beta = mvn.sample((N,))
         else:
             log_beta = torch.normal(self.prior_mu, self.prior_sigma, (N, 1))
-            
-        if self.eta_true < 1:
-            # TODO: supply parameters on range of random uniform
-            eta = torch.rand((N, 1))
-            
-            log_beta = torch.cat((log_beta, eta), 1)
-
         return log_beta
