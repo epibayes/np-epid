@@ -51,6 +51,16 @@ def test_abc_sim_heterog_summ():
     
     _test(beta_true, prior_mu, prior_sigma, het, summarize, flatten)
     
+def test_abc_sim_partial():
+    beta_true = .15
+    prior_mu = -3
+    prior_sigma = 1
+    het = False
+    flatten = False
+    summarize = False
+    
+    _test(beta_true, prior_mu, prior_sigma, het, summarize, flatten)
+    
     
 def _test(beta_true, prior_mu, prior_sigma, het, summarize, flatten, eta=1):
     si_model = SIModel(alpha, gamma, beta_true, het, 

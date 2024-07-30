@@ -138,7 +138,7 @@ class SIModel(Simulator):
                 X[:, t] * (1 - Y[:, t-1]),
                 observed,
                 Y[:, t-1]
-            ) 
+            )
             # if someone is not yet infected, simulate transmission event
             discharge = np.random.binomial(1, self.gamma, size=self.N)
             screening = np.random.binomial(1, self.alpha, self.N)

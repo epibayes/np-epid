@@ -52,14 +52,14 @@ si-model-het:
 
 si-model-id:
   <<: *si-model
-  beta_true: [0.15, 0, 0, 0, 0, 0, 0]
-  prior_mu: [-3, -1.5, -1.5, -1.5, -1.5, -1.5, 1] #[-4, -4, -4, -4, -4, -4, -4] # [-3, -3, -3, -3, -3, -3, -3]
-  prior_sigma: [2, 2, 2, 2, 2, 2, 2] # [1, 1, 1, 1, 1, 1, 1]
+  beta_true: [0.15, 1e-8, 1e-8, 1e-8, 1e-8, 1e-8, 1e-8]
+  prior_mu: [-4, -4, -4, -4, -4, -4, -4] # [-3, -1.5, -1.5, -1.5, -1.5, -1.5, 1]
+  prior_sigma: [1, 1, 1, 1, 1, 1, 1] # [2, 2, 2, 2, 2, 2, 2]
   heterogeneous: True
 
 si-model-partial:
   <<: *si-model # change this to het eventually
-  eta_true: 0.5
+  eta_true: 0.05
 
 crkp: &crkp
   <<: *simulator
