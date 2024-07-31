@@ -53,9 +53,8 @@ def contact_matrix(arr):
     x, y = np.meshgrid(arr, arr)
     return (x == y).astype(int)
 
-def save_results(posterior_params, val_losses, cfg,
-                 multidim):
-    if multidim:
+def save_results(posterior_params, val_losses, cfg):
+    if cfg.experiment in ["si-model-het", "si-model-id"]:
         mu = posterior_params[0].tolist()
         L = posterior_params[1]
         sigma = (L @ L.T).tolist()
@@ -76,6 +75,7 @@ def save_results(posterior_params, val_losses, cfg,
         print(np.round(sigma, 3))
         prior_mu = cfg[cfg.experiment]["prior_mu"]
         prior_sigma = cfg[cfg.experiment]["prior_sigma"]
+    # TODO: is there any reason i'd want to save eta?
     results = {"mu": mu, "sigma":sigma,
                "val_loss": val_losses[-1],
                "n_sample": cfg[cfg.experiment]["n_sample"],

@@ -9,7 +9,7 @@ class SIModel(Simulator):
     def __init__(self, alpha, gamma, beta_true, heterogeneous,
                  prior_mu, prior_sigma,  N, T, summarize=False,
                  observed_seed=None, room=False, n_sample=None,
-                 flatten=True, pi=None, eta_true = None):
+                 flatten=True, pi=None, eta = None):
         self.alpha = alpha # baseline proportion infected in pop
         self.gamma = gamma # discharge rate
         if np.isscalar(beta_true):
@@ -24,10 +24,10 @@ class SIModel(Simulator):
             assert len(self.beta_true) == len(self.pi)
         else:
             self.pi = pi
-        if eta_true is None:
-            self.eta_true = 1
+        if eta is None:
+            self.eta = 1
         else:
-            self.eta_true = eta_true
+            self.eta = eta
         self.N = N
         self.T = T
         self.het = heterogeneous
@@ -40,8 +40,6 @@ class SIModel(Simulator):
             self.d_x = self.d_theta
         else:
             self.d_x = T * self.d_theta
-        if self.eta_true < 1:
-            self.d_theta += 1
         self.summarize = summarize
         self.n_sample = n_sample
         if n_sample is not None:
@@ -59,31 +57,22 @@ class SIModel(Simulator):
             return
 
     def simulate_data(self):
-        thetas = self.sample_parameters(self.n_sample, seed=5)
-        if self.eta_true == 1:
-            logbetas = thetas
-            etas = np.ones(self.n_sample)
-        else:
-            logbetas = thetas[:, :-1]
-            etas = np.array(thetas[:, -1])
+        logbetas = self.sample_logbeta(self.n_sample, seed=5)
         xs = torch.empty((self.n_sample, self.d_x))
         for i in range(self.n_sample):
             random_seed = 5 * i
             xs[i] = self.SI_simulator(
                 np.array(logbetas[i]),
                 random_seed,
-                etas[i]
             ).flatten()
 
-        return xs, thetas.float()
+        return xs, logbetas.float()
     
     def get_observed_data(self, observed_seed=None):
         if observed_seed is None:
             observed_seed = self.obs
         logbeta_true = np.log(np.array(self.beta_true))
-        x_o = self.SI_simulator(
-            np.array(logbeta_true), observed_seed, self.eta_true
-            )
+        x_o = self.SI_simulator(np.array(logbeta_true), observed_seed)
         if self.summarize:
             x_o = x_o.unsqueeze(0)
         if not self.het:
@@ -92,12 +81,11 @@ class SIModel(Simulator):
             x_o = x_o.unsqueeze(0)
         return x_o.float()
 
-    def SI_simulator(self, logbeta, seed=None, eta=1):
+    def SI_simulator(self, logbeta, seed=None):
         beta = np.exp(logbeta)
         if len(beta) == 1:
             beta = np.array(((beta[0],)))
-            
-        assert len(beta) + int(self.eta_true < 1) == self.d_theta
+        assert len(beta) == self.d_theta
         if self.pi is not None:
             beta = beta * self.pi
         if seed is not None:
@@ -130,10 +118,10 @@ class SIModel(Simulator):
             p = 1 - np.exp(-hazard / self.N)
             new_infections = np.random.binomial(1, p, self.N)
             X[:, t] = np.where(I, np.ones(self.N), new_infections)
-            if eta == 1:
+            if self.eta == 1:
                 observed = np.ones(self.N)
             else:
-                observed = binomial(1, eta, self.N)
+                observed = binomial(1, self.eta, self.N)
             Y[:, t] = np.where(
                 X[:, t] * (1 - Y[:, t-1]),
                 observed,
@@ -161,15 +149,7 @@ class SIModel(Simulator):
             data = data.flatten()
         
         return data
-    
-    def sample_parameters(self, N, seed=None):
-        logbeta = self.sample_logbeta(N, seed=None)
-        if self.eta_true == 1:
-            return logbeta
-            # TODO: supply parameters on range of random uniform
-        else:
-            eta = torch.rand((N, 1))
-            return torch.cat((logbeta, eta), 1)
+
     
     def sample_logbeta(self, N, seed=None):
         if seed is not None:

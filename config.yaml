@@ -59,7 +59,7 @@ si-model-id:
 
 si-model-partial:
   <<: *si-model # change this to het eventually
-  eta_true: 0.05
+  eta_true: 0.25
 
 crkp: &crkp
   <<: *simulator
