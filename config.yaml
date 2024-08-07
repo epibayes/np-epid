@@ -39,7 +39,7 @@ si-model: &si-model
   observed_seed: 29
   heterogeneous: False
   pi:
-  eta_true:
+  eta:
 
 si-model-het:
   <<: *si-model
@@ -58,8 +58,8 @@ si-model-id:
   heterogeneous: True
 
 si-model-partial:
-  <<: *si-model # change this to het eventually
-  eta_true: 0.25
+  <<: *si-model-het # change this to het eventually
+  eta: 0.1
 
 crkp: &crkp
   <<: *simulator
