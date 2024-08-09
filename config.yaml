@@ -41,7 +41,7 @@ si-model: &si-model
   pi:
   eta:
 
-si-model-het:
+si-model-het: &si-model-het
   <<: *si-model
   beta_true: [0.05, .1, .2, .3, .4, .5, 5]
   prior_mu: [-3, -1.5, -1.5, -1.5, -1.5, -1.5, 1]
