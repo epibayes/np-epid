@@ -3,6 +3,8 @@ import lightning as L
 from torch.utils.data import DataLoader, random_split
 import yaml
 import numpy as np
+import pandas as pd
+import glob
 
 # theoretically, variational dropout takes care of overfitting
 class DataModule(L.LightningDataModule):
@@ -89,3 +91,84 @@ def save_results(posterior_params, val_losses, cfg):
     # should probably save seed, etc.
     with open("results.yaml", "w", encoding="utf-8") as yaml_file:
         yaml.dump(results, yaml_file)
+        
+# reading multiruns
+
+def get_results(path, drop=True):
+    results = glob.glob(path + "/**/results.yaml")
+    data = dict()
+    for res in results:
+        with open(res, "r") as stream:
+            yml = yaml.safe_load(stream)
+            for k, v in yml.items():
+                if k not in data.keys():
+                    data[k] = [v]
+                else:
+                    data[k].append(v)
+    data = pd.DataFrame(data)
+    data.drop(columns=["_target_", "lr", "batch_size", "dropout", "seed"])
+    return data
+        
+# LIKELIHOOD BASED ESTIMATION
+
+def simulator(alpha, beta, gamma, N, T, seed, het=False):
+    if not het:
+        beta = [beta]
+    X  = np.empty((N, T))
+    np.random.seed(seed)
+    X[:, 0] = np.random.binomial(1, alpha, N)
+    F = np.arange(N) % 5
+    R = np.arange(N) % (N // 2)
+    fC = contact_matrix(F)
+    rC = contact_matrix(R)
+    for t in range(1, T):
+        I = X[:, t-1]
+        # components dependent on individual covariates
+        hazard = compute_hazard(beta, I, N, F, fC, rC, het)
+        p = 1 - np.exp(-hazard / N)
+        new_infections = np.random.binomial(1, p, N)
+        X[:, t] = np.where(I, np.ones(N), new_infections)
+        discharge = np.random.binomial(1, gamma, N)
+        screening = np.random.binomial(1, alpha, N)
+        X[:, t] = np.where(discharge, screening, X[:, t])
+    return X
+
+def compute_hazard(beta, I, N, F, fC, rC, het):
+    hazard = I.sum() * beta[0] * np.ones(N)
+    if het:
+        hazard += (fC * I).sum(1) * beta[F+1]
+        hazard += (rC * I).sum(1) * beta[-1]
+    return hazard
+
+def nll(beta, alpha, gamma, N, T, X, het):
+    # beta = beta / np.array([1, 300, 300, 300, 300, 300, 300])
+    return - x_loglikelihood(beta, alpha, gamma, N, T, X, het)
+
+
+def x_loglikelihood(beta, alpha, gamma, N, T, X, het=False):
+    ans = np.log(
+        alpha ** X[:, 0] * (1 - alpha) ** (1 - X[:, 0])
+        ).sum()
+    if not het:
+        beta = [beta]
+    F = np.arange(N) % 5
+    R = np.arange(N) % (N // 2)
+    fC = contact_matrix(F)
+    rC = contact_matrix(R)
+    for t in range(1, T):
+        xs = X[:, t-1]
+        xt = X[:, t]
+        hazard = compute_hazard(beta, xs, N, F, fC, rC, het)
+        ans += (xt * xs  * np.log(
+            gamma * alpha + (1 - gamma)
+        )).sum()
+        ans += (xt * (1 - xs)  * np.log(
+            gamma * alpha + (1 - gamma) * (1 - np.exp(- hazard / N))
+        )).sum()
+        ans += ((1 - xt) * xs  * np.log(
+            gamma * (1 - alpha) + 1e-8
+        )).sum()
+        ans += ((1 - xt) * (1 - xs) * np.log(
+            gamma *(1 - alpha) + (1 - gamma) * (np.exp(- hazard/ N))
+        )).sum()
+    return ans   

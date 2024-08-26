@@ -49,6 +49,7 @@ si-model-het: &si-model-het
   heterogeneous: True
   observed_seed: 31
   N: 300
+  gamma: 0.02
 
 si-model-id:
   <<: *si-model

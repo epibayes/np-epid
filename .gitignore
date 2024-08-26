@@ -10,3 +10,4 @@ multirun
 experiments.md
 *.csv
 *.png
+*.npy
