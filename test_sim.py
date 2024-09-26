@@ -27,8 +27,8 @@ si_model = SIModel(alpha, gamma, beta_true, het,
                    flatten=False)
 
 x_o = si_model.get_observed_data()
-if not summarize:
-    x_o = x_o.transpose(0, 1)
+# if not summarize:
+#     x_o = x_o.transpose(0, 1)
 prior_sampler = lambda: si_model.sample_logbeta(1)
 simulator = lambda theta, seed: si_model.SI_simulator(theta, seed)
 

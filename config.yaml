@@ -61,15 +61,16 @@ si-model-id:
 si-model-partial:
   <<: *si-model-het # change this to het eventually
   eta: 0.1
+  gamma: 0.02
 
 crkp: &crkp
   <<: *simulator
   _target_: src.dataset.crkp.CRKPTransmissionSimulator
-  path: /Volumes/umms-esnitkin/Project_KPC_LTACH/Analysis/LTACH_transmission_modeling/preprocessed
-  prior_mu: -2
+  path: /Volumes/umms-esnitkin/Project_KPC_LTACH/Analysis/LTACH_transmission_modeling/preprocessed/resampled
+  prior_mu: -1
   prior_sigma: 1
   heterogeneous: False
-  scale: True
+  N: -1
 
 crkp-het:
   <<: *crkp

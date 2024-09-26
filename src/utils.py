@@ -3,6 +3,8 @@ import lightning as L
 from torch.utils.data import DataLoader, random_split
 import yaml
 import numpy as np
+import pandas as pd
+import glob
 
 # theoretically, variational dropout takes care of overfitting
 class DataModule(L.LightningDataModule):
@@ -54,15 +56,7 @@ def contact_matrix(arr):
     return (x == y).astype(int)
 
 def save_results(posterior_params, val_losses, cfg):
-    if cfg.experiment == "si-model":
-        mu = posterior_params[0].item()
-        sigma = posterior_params[1].item()
-        print(np.round(np.exp(mu + sigma**2 / 2), 3))
-        print(np.round(mu, 3))
-        print(np.round(sigma, 3))
-        prior_mu = cfg[cfg.experiment]["prior_mu"]
-        prior_sigma = cfg[cfg.experiment]["prior_sigma"]
-    else:
+    if cfg.experiment in ["si-model-het", "si-model-id", "si-model-partial", "crkp-het"]:
         mu = posterior_params[0].tolist()
         L = posterior_params[1]
         sigma = (L @ L.T).tolist()
@@ -75,6 +69,14 @@ def save_results(posterior_params, val_losses, cfg):
         print(np.round(sdiag, 3))
         prior_mu = list(cfg[cfg.experiment]["prior_mu"])
         prior_sigma = list(cfg[cfg.experiment]["prior_sigma"])
+    else:
+        mu = posterior_params[0].item()
+        sigma = posterior_params[1].item()
+        print(np.round(np.exp(mu + sigma**2 / 2), 3))
+        print(np.round(mu, 3))
+        print(np.round(sigma, 3))
+        prior_mu = cfg[cfg.experiment]["prior_mu"]
+        prior_sigma = cfg[cfg.experiment]["prior_sigma"]
     # TODO: is there any reason i'd want to save eta?
     results = {"mu": mu, "sigma":sigma,
                "val_loss": val_losses[-1],
@@ -90,6 +92,22 @@ def save_results(posterior_params, val_losses, cfg):
     with open("results.yaml", "w", encoding="utf-8") as yaml_file:
         yaml.dump(results, yaml_file)
         
+# reading multiruns
+
+def get_results(path, drop=True):
+    results = glob.glob(path + "/**/results.yaml")
+    data = dict()
+    for res in results:
+        with open(res, "r") as stream:
+            yml = yaml.safe_load(stream)
+            for k, v in yml.items():
+                if k not in data.keys():
+                    data[k] = [v]
+                else:
+                    data[k].append(v)
+    data = pd.DataFrame(data)
+    data.drop(columns=["_target_", "lr", "batch_size", "dropout", "seed"])
+    return data
         
 # LIKELIHOOD BASED ESTIMATION
 
@@ -153,4 +171,12 @@ def x_loglikelihood(beta, alpha, gamma, N, T, X, het=False):
         ans += ((1 - xt) * (1 - xs) * np.log(
             gamma *(1 - alpha) + (1 - gamma) * (np.exp(- hazard/ N))
         )).sum()
-    return ans   
+    return ans
+
+
+### misc
+
+def lognormal_sd(log_mean, log_sd):
+    a = np.exp(log_sd**2) - 1
+    b = np.exp(2*log_mean + log_sd**2)
+    return (a*b)**0.5

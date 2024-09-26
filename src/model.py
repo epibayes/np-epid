@@ -45,6 +45,7 @@ class GaussianDensityNetwork(L.LightningModule):
             sigma = diag(torch.exp(sigma))
         else:
             sigma = lower_tri(sigma, self.dim)
+            # force diagonal entries to be positive
             sigma.diagonal(dim1=-2, dim2=-1).copy_(
                 sigma.diagonal(dim1=-2,dim2=-1).exp()
             )

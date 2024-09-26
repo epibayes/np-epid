@@ -6,7 +6,7 @@ from timeit import default_timer as timer
 
 def abc_rejection_sampler(S, epsilon, prior_sampler, simulator, 
                           x_o, max_attempts=10000, summarize=False,
-                          error_scaling = None):
+                          print_every=5000, error_scaling = None):
     # S: total number of particles
     samples = []
     attempts = 0
@@ -26,7 +26,7 @@ def abc_rejection_sampler(S, epsilon, prior_sampler, simulator,
             if attempts == max_attempts:
                 print("Maximum attempts reached, halting")
                 return np.array(samples), errors
-            if not attempts % 5000:
+            if not attempts % print_every:
                 print(f"Attempts: {attempts:,}")
     end_time = timer()
     accept_rate = S / attempts
