@@ -54,7 +54,15 @@ def contact_matrix(arr):
     return (x == y).astype(int)
 
 def save_results(posterior_params, val_losses, cfg):
-    if cfg.experiment in ["si-model-het", "si-model-id"]:
+    if cfg.experiment == "si-model":
+        mu = posterior_params[0].item()
+        sigma = posterior_params[1].item()
+        print(np.round(np.exp(mu + sigma**2 / 2), 3))
+        print(np.round(mu, 3))
+        print(np.round(sigma, 3))
+        prior_mu = cfg[cfg.experiment]["prior_mu"]
+        prior_sigma = cfg[cfg.experiment]["prior_sigma"]
+    else:
         mu = posterior_params[0].tolist()
         L = posterior_params[1]
         sigma = (L @ L.T).tolist()
@@ -67,14 +75,6 @@ def save_results(posterior_params, val_losses, cfg):
         print(np.round(sdiag, 3))
         prior_mu = list(cfg[cfg.experiment]["prior_mu"])
         prior_sigma = list(cfg[cfg.experiment]["prior_sigma"])
-    else:
-        mu = posterior_params[0].item()
-        sigma = posterior_params[1].item()
-        print(np.round(np.exp(mu + sigma**2 / 2), 3))
-        print(np.round(mu, 3))
-        print(np.round(sigma, 3))
-        prior_mu = cfg[cfg.experiment]["prior_mu"]
-        prior_sigma = cfg[cfg.experiment]["prior_sigma"]
     # TODO: is there any reason i'd want to save eta?
     results = {"mu": mu, "sigma":sigma,
                "val_loss": val_losses[-1],
@@ -89,3 +89,68 @@ def save_results(posterior_params, val_losses, cfg):
     # should probably save seed, etc.
     with open("results.yaml", "w", encoding="utf-8") as yaml_file:
         yaml.dump(results, yaml_file)
+        
+        
+# LIKELIHOOD BASED ESTIMATION
+
+def simulator(alpha, beta, gamma, N, T, seed, het=False):
+    if not het:
+        beta = [beta]
+    X  = np.empty((N, T))
+    np.random.seed(seed)
+    X[:, 0] = np.random.binomial(1, alpha, N)
+    F = np.arange(N) % 5
+    R = np.arange(N) % (N // 2)
+    fC = contact_matrix(F)
+    rC = contact_matrix(R)
+    for t in range(1, T):
+        I = X[:, t-1]
+        # components dependent on individual covariates
+        hazard = compute_hazard(beta, I, N, F, fC, rC, het)
+        p = 1 - np.exp(-hazard / N)
+        new_infections = np.random.binomial(1, p, N)
+        X[:, t] = np.where(I, np.ones(N), new_infections)
+        discharge = np.random.binomial(1, gamma, N)
+        screening = np.random.binomial(1, alpha, N)
+        X[:, t] = np.where(discharge, screening, X[:, t])
+    return X
+
+def compute_hazard(beta, I, N, F, fC, rC, het):
+    hazard = I.sum() * beta[0] * np.ones(N)
+    if het:
+        hazard += (fC * I).sum(1) * beta[F+1]
+        hazard += (rC * I).sum(1) * beta[-1]
+    return hazard
+
+def nll(beta, alpha, gamma, N, T, X, het):
+    # beta = beta / np.array([1, 300, 300, 300, 300, 300, 300])
+    return - x_loglikelihood(beta, alpha, gamma, N, T, X, het)
+
+
+def x_loglikelihood(beta, alpha, gamma, N, T, X, het=False):
+    ans = np.log(
+        alpha ** X[:, 0] * (1 - alpha) ** (1 - X[:, 0])
+        ).sum()
+    if not het:
+        beta = [beta]
+    F = np.arange(N) % 5
+    R = np.arange(N) % (N // 2)
+    fC = contact_matrix(F)
+    rC = contact_matrix(R)
+    for t in range(1, T):
+        xs = X[:, t-1]
+        xt = X[:, t]
+        hazard = compute_hazard(beta, xs, N, F, fC, rC, het)
+        ans += (xt * xs  * np.log(
+            gamma * alpha + (1 - gamma)
+        )).sum()
+        ans += (xt * (1 - xs)  * np.log(
+            gamma * alpha + (1 - gamma) * (1 - np.exp(- hazard / N))
+        )).sum()
+        ans += ((1 - xt) * xs  * np.log(
+            gamma * (1 - alpha) + 1e-8
+        )).sum()
+        ans += ((1 - xt) * (1 - xs) * np.log(
+            gamma *(1 - alpha) + (1 - gamma) * (np.exp(- hazard/ N))
+        )).sum()
+    return ans   
