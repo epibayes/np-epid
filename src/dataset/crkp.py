@@ -8,7 +8,7 @@ from torch.distributions import MultivariateNormal
 class CRKPTransmissionSimulator(Simulator):
     def __init__(self, path, prior_mu, prior_sigma, n_sample=None,
                  observed_seed=None, heterogeneous=True,
-                 flatten=False, scale=True):
+                 flatten=False, N=False):
         self.n_sample = n_sample
         self.het = heterogeneous
         self.d_theta = 8 if self.het else 1 # six floors, facility and room level transmission rates
@@ -23,7 +23,6 @@ class CRKPTransmissionSimulator(Simulator):
         self.N, self.T = self.W.shape
         self.d_x = self.T * 8 if self.het else self.T
         self.flatten = flatten # only set this false for ABC comparison
-        self.scale = scale
         self.lam = None
         if n_sample is not None:
             self.data, self.theta = self.simulate_data()
@@ -43,6 +42,7 @@ class CRKPTransmissionSimulator(Simulator):
             self.prior_sigma = sigma
 
     def load_observed_data(self, path):
+        # todo: add logic for switching between homogeneous/hetero
         with open(f"{path}/observed_data.npy", "rb") as f:
             x = np.load(f)
         if self.het:
@@ -51,11 +51,7 @@ class CRKPTransmissionSimulator(Simulator):
             return torch.tensor(x[0,:]).unsqueeze(0)
 
     def get_observed_data(self):
-         # TODO: scale that sucka
-        if self.scale:
-            x_o  = self.x_o / self.lam.unsqueeze(1)
-        else:
-            x_o = self.x_o
+        x_o = self.x_o
         if self.flatten:
             return x_o.float().flatten().unsqueeze(0)
         else:
@@ -69,13 +65,6 @@ class CRKPTransmissionSimulator(Simulator):
             xs[i] = self.CRKP_simulator(
                 np.array(logbetas[i]), rs
                 ).flatten()
-            
-        if self.scale:
-            X = xs.unflatten(1,(self.d_theta, self.T))
-            self.lam = X.mean(dim=(0,2))
-            X = X / self.lam.unsqueeze(1)
-            xs = X.flatten(start_dim=1)
-
 
         return xs, logbetas.float()
     

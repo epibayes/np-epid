@@ -56,7 +56,7 @@ def contact_matrix(arr):
     return (x == y).astype(int)
 
 def save_results(posterior_params, val_losses, cfg):
-    if cfg.experiment in ["si-model-het", "si-model-id"]:
+    if cfg.experiment in ["si-model-het", "si-model-id", "si-model-partial", "crkp-het"]:
         mu = posterior_params[0].tolist()
         L = posterior_params[1]
         sigma = (L @ L.T).tolist()
@@ -171,4 +171,12 @@ def x_loglikelihood(beta, alpha, gamma, N, T, X, het=False):
         ans += ((1 - xt) * (1 - xs) * np.log(
             gamma *(1 - alpha) + (1 - gamma) * (np.exp(- hazard/ N))
         )).sum()
-    return ans   
+    return ans
+
+
+### misc
+
+def lognormal_sd(log_mean, log_sd):
+    a = np.exp(log_sd**2) - 1
+    b = np.exp(2*log_mean + log_sd**2)
+    return (a*b)**0.5
