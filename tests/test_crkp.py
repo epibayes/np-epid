@@ -37,13 +37,12 @@ def test_het():
             overrides=[
                 "experiment=crkp-het",
                 "train.max_epochs=10",
-                "crkp.n_sample=1"
+                "crkp.n_sample=100"
             ],
         )
     data_cfg = cfg[cfg.experiment]
-    dataset = instantiate(data_cfg)
+    dataset = instantiate(data_cfg) # why does this test take so long to run
     observed_data = dataset.get_observed_data()
-    return
     batch_size = data_cfg.n_sample
     datamodule = DataModule(
         dataset, cfg.train.seed, batch_size, cfg.train.train_frac

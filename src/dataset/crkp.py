@@ -105,20 +105,24 @@ class CRKPTransmissionSimulator(Simulator):
             assert I[w == 0].sum() == 0
             hazard = I.sum() * beta_0 * np.ones(N)
             if self.het:
-                # generate contact matrix
-                # most likely this is a massive computational bottleneck
-                # is there an easy way to reduce complexity...
-                fC = contact_matrix(f)
-                # guarantee that there are no infecteds who aren't present
-                # how many infected floormates?
-                hazard += (fC * I).sum(1) * beta[f]
-                # this is also probably mad slow, too
-                rC = contact_matrix(r)
-                infected_roommates = (rC * I).sum(1)
-                room_count[t] = (infected_roommates > 1).sum() / 2
-                hazard += infected_roommates * beta[-1]
-            p = 1 - np.exp(-hazard / N) # not the end of the world to normalize by size of population
-            X[:, t] = np.where(staying * (1 - I), np.random.binomial(1, p, N), X[:, t])
+                n_admitted = w.sum()
+                if n_admitted == 0:
+                    pass
+                else:
+                    # generate contact matrix
+                    fa = f[w > 0]
+                    fC = contact_matrix(fa)
+                    # guarantee that there are no infecteds who aren't present
+                    # how many infected floormates?
+                    Ia = I[w > 0]
+                    hazard[w > 0] += (fC * Ia).sum(1) * beta[fa]
+                    ra = r[w > 0]
+                    rC = contact_matrix(ra)
+                    infected_roommates = (rC * Ia).sum(1)
+                    room_count[t] = (infected_roommates > 1).sum() / 2
+                    hazard[w > 0] += infected_roommates * beta[-1]
+                p = 1 - np.exp(-hazard / N) # not the end of the world to normalize by size of population
+                X[:, t] = np.where(staying * (1 - I), np.random.binomial(1, p, N), X[:, t])
             x = X[:, t]
             w = self.W[:, t]
             f = self.F[:, t]
