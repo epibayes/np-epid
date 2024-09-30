@@ -3,7 +3,7 @@ from hydra.utils import instantiate
 from src.utils import DataModule
 from hydra import compose, initialize
 
-def test():
+def test_homog():
     with initialize(config_path=".."):
         cfg = compose(
             config_name="config",
@@ -16,6 +16,34 @@ def test():
     data_cfg = cfg[cfg.experiment]
     dataset = instantiate(data_cfg)
     observed_data = dataset.get_observed_data()
+    batch_size = data_cfg.n_sample
+    datamodule = DataModule(
+        dataset, cfg.train.seed, batch_size, cfg.train.train_frac
+        )
+    model = instantiate(cfg.model, dataset.d_x, dataset.d_theta)
+    callbacks = None
+    trainer = L.Trainer(max_epochs=cfg.train.max_epochs,
+                        devices=cfg.train.devices, callbacks=callbacks,
+                        detect_anomaly=True)
+
+    trainer.fit(model, datamodule=datamodule)
+
+    model.predict_step(observed_data)
+    
+def test_het():
+    with initialize(config_path=".."):
+        cfg = compose(
+            config_name="config",
+            overrides=[
+                "experiment=crkp-het",
+                "train.max_epochs=10",
+                "crkp.n_sample=1"
+            ],
+        )
+    data_cfg = cfg[cfg.experiment]
+    dataset = instantiate(data_cfg)
+    observed_data = dataset.get_observed_data()
+    return
     batch_size = data_cfg.n_sample
     datamodule = DataModule(
         dataset, cfg.train.seed, batch_size, cfg.train.train_frac

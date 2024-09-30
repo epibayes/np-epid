@@ -105,11 +105,14 @@ class CRKPTransmissionSimulator(Simulator):
             assert I[w == 0].sum() == 0
             hazard = I.sum() * beta_0 * np.ones(N)
             if self.het:
-                # # generate contact matrix
+                # generate contact matrix
+                # most likely this is a massive computational bottleneck
+                # is there an easy way to reduce complexity...
                 fC = contact_matrix(f)
                 # guarantee that there are no infecteds who aren't present
                 # how many infected floormates?
                 hazard += (fC * I).sum(1) * beta[f]
+                # this is also probably mad slow, too
                 rC = contact_matrix(r)
                 infected_roommates = (rC * I).sum(1)
                 room_count[t] = (infected_roommates > 1).sum() / 2
