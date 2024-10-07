@@ -43,8 +43,8 @@ si-model: &si-model
 
 si-model-het: &si-model-het
   <<: *si-model
-  beta_true: [0.05, .1, .2, .3, .4, .5, 5]
-  prior_mu: [-3, -1.5, -1.5, -1.5, -1.5, -1.5, 1]
+  beta_true: [0.05, 0.02, 0.04, 0.06, 0.08, 0.1, 0.033] # [0.05, .1, .2, .3, .4, .5, 5]
+  prior_mu: [-4, -4, -4, -4, -4, -4, -4] # [-3, -1.5, -1.5, -1.5, -1.5, -1.5, 1]
   prior_sigma: [1, 1, 1, 1, 1, 1, 1]
   heterogeneous: True
   observed_seed: 31

@@ -106,9 +106,9 @@ class SIModel(Simulator):
             # components dependent on individual covariates
             hazard = I.sum() * beta[0] * np.ones(self.N)
             if self.het:
-                hazard += (fC * I).sum(1) * beta[F+1]
+                hazard += (fC * I).sum(1) * beta[F+1] * 5
                 infected_roommates = (rC * I).sum(1)
-                hazard += infected_roommates * beta[-1]
+                hazard += infected_roommates * beta[-1] * (self.N / 2)
                 roommates_obs = (rC * Y[:, t-1]).sum(1)
                 assert (roommates_obs <= infected_roommates).all()
                 if roommates_obs.max() == 0:
