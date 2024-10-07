@@ -72,7 +72,7 @@ crkp: &crkp
   heterogeneous: False
   N: -1
 
-crkp-het:
+crkp-het: # best run: d_model = 40
   <<: *crkp
   heterogeneous: true
   prior_mu: [-2, -1, -1, -1, -1, -1, -1, 0]

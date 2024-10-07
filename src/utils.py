@@ -94,8 +94,14 @@ def save_results(posterior_params, val_losses, cfg):
         
 # reading multiruns
 
-def get_results(path, drop=True):
-    results = glob.glob(path + "/**/results.yaml")
+def get_results(path, drop=True, multirun=True):
+    extension =  "/results.yaml"
+    if multirun: extension = "/**" + extension
+    # if multirun:
+    #     extension = "/**/results.yaml"
+    # else:
+    #     extension = "/results.yaml"
+    results = glob.glob(path + extension)
     data = dict()
     for res in results:
         with open(res, "r") as stream:

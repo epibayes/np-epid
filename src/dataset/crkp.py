@@ -121,8 +121,8 @@ class CRKPTransmissionSimulator(Simulator):
                     infected_roommates = (rC * Ia).sum(1)
                     room_count[t] = (infected_roommates > 1).sum() / 2
                     hazard[w > 0] += infected_roommates * beta[-1]
-                p = 1 - np.exp(-hazard / N) # not the end of the world to normalize by size of population
-                X[:, t] = np.where(staying * (1 - I), np.random.binomial(1, p, N), X[:, t])
+            p = 1 - np.exp(-hazard / N) # not the end of the world to normalize by size of population
+            X[:, t] = np.where(staying * (1 - I), np.random.binomial(1, p, N), X[:, t])
             x = X[:, t]
             w = self.W[:, t]
             f = self.F[:, t]
