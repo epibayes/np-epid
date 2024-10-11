@@ -23,7 +23,6 @@ class CRKPTransmissionSimulator(Simulator):
         self.N, self.T = self.W.shape
         self.d_x = self.T * 8 if self.het else self.T
         self.flatten = flatten # only set this false for ABC comparison
-        self.lam = None
         if n_sample is not None:
             self.data, self.theta = self.simulate_data()
 
@@ -75,24 +74,20 @@ class CRKPTransmissionSimulator(Simulator):
         beta_0 = beta[0] if self.het else beta
         N, T = self.W.shape
         beta = np.exp(logbeta)
-        # current admitted status
-        w = np.zeros(N)
-        # current floor
-        f = np.zeros(N).astype(int)
-        # current room
-        r = np.zeros(N).astype(int)
         X = np.empty((N, T))
-        # current status
-        x = np.empty(N); x[:] = np.nan
-        # # current infection status
-        # note that no new infections will be simulated in timestep 0
+        # load screen data for first day
+        X[:, 0] = self.V[:, 0]
+        # TODO: fix room statistic
         room_count = np.empty(T)
-        for t in range(T):
+        for t in range(1, T):
+            x = X[:, t-1]
+            w = self.W[:, t-1]
+            f = self.F[:, t-1]
+            r = self.R[:, t-1]
             # case 1: not present
             # if absent, set to nan
             # otherwise, inherit old status
-            X[:, t] = np.where(1 - self.W[:, t], np.nan, x)
-            # case 2: new arrival
+            X[:, t] = np.where(1 - self.W[:, t], np.nan, x)            # case 2: new arrival
             newly_admitted = self.W[:, t] * (1 - w)
             # if newly admitted, load test data if available, otherwise default to last status
             X[:, t] = np.where(newly_admitted, self.V[:, t], X[:, t])
@@ -101,32 +96,38 @@ class CRKPTransmissionSimulator(Simulator):
             # otherwise, inherit old status
             staying = self.W[:, t] * w
             # who was infected at the last timestep?
-            I = (x == 1).astype(int)
-            assert I[w == 0].sum() == 0
-            hazard = I.sum() * beta_0 * np.ones(N)
+            Ia = x[w > 0]
+            if np.isnan(Ia).any():
+                1/0
+            hazard = Ia.sum() * beta_0 * np.ones(N)
             if self.het:
-                n_admitted = w.sum()
-                if n_admitted == 0:
-                    pass
-                else:
-                    # generate contact matrix
-                    fa = f[w > 0]
-                    fC = contact_matrix(fa)
-                    # guarantee that there are no infecteds who aren't present
-                    # how many infected floormates?
-                    Ia = I[w > 0]
-                    hazard[w > 0] += (fC * Ia).sum(1) * beta[fa]
-                    ra = r[w > 0]
-                    rC = contact_matrix(ra)
-                    infected_roommates = (rC * Ia).sum(1)
-                    room_count[t] = (infected_roommates > 1).sum() / 2
-                    hazard[w > 0] += infected_roommates * beta[-1]
+                fa = f[w > 0]
+                fC = contact_matrix(fa)
+                # guarantee that there are no infecteds who aren't present
+                # how many infected floormates?
+                hazard[w > 0] += (fC * Ia).sum(1) * beta[fa]
+                ra = r[w > 0]
+                rC = contact_matrix(ra)
+                infected_roommates = (rC * Ia).sum(1)
+                # if infected_roommates.max() > 0:
+                #     room_infect_density[t] = infected_roommates[infected_roommates > 0].mean()
+                room_count[t-1] = (infected_roommates > 1).sum()
+                hazard[w > 0] += infected_roommates * beta[-1]
             p = 1 - np.exp(-hazard / N) # not the end of the world to normalize by size of population
-            X[:, t] = np.where(staying * (1 - I), np.random.binomial(1, p, N), X[:, t])
-            x = X[:, t]
-            w = self.W[:, t]
-            f = self.F[:, t]
-            r = self.R[:, t]
+            X[:, t] = np.where(staying * (x == 0), np.random.binomial(1, p, N), X[:, t])
+
+        if self.het:
+            # compute last entry of the room count (?)
+            r = self.R[:, T-1]
+            w = self.W[:, T-1]
+            x = X[:, T-1]
+            ra = r[w > 0]
+            rC = contact_matrix(ra)
+            Ia = x[w > 0]
+            infected_roommates = (rC * Ia).sum(1)
+            room_count[T-1] = (infected_roommates > 1).sum()
+            
+            
 
         total_count = np.nansum(X, axis=0)
 
@@ -141,9 +142,6 @@ class CRKPTransmissionSimulator(Simulator):
         else:
             data =  torch.tensor(total_count).float()
 
-        # if self.flatten:
-        #     data = data.flatten()
-
         return data
 
     def sample_logbeta(self, N, seed=None):
@@ -155,4 +153,3 @@ class CRKPTransmissionSimulator(Simulator):
         else:
             logbeta = torch.normal(self.prior_mu, self.prior_sigma, (N, 1))
         return logbeta
-
