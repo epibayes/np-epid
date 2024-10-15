@@ -5,15 +5,16 @@ from .simulator import Simulator
 from ..utils import contact_matrix
 from torch.distributions import MultivariateNormal
 
+SCALE = [129., 28., 38., 35., 27., 17., 95]
+
 class CRKPTransmissionSimulator(Simulator):
     def __init__(self, path, prior_mu, prior_sigma, n_sample=None,
                  observed_seed=None, heterogeneous=True,
-                 flatten=False, N=False):
+                 flatten=False, N=False, pi=None):
         self.n_sample = n_sample
         self.het = heterogeneous
-        self.d_theta = 8 if self.het else 1 # six floors, facility and room level transmission rates
+        self.d_theta = 7 if self.het else 1 # five* floors, facility and room level transmission rates
         self.set_prior(prior_mu, prior_sigma)
-
         # who is present when?
         self.W = pd.read_csv(f"{path}/facility_trace.csv", index_col=0).values
         # tests upon entry
@@ -21,13 +22,20 @@ class CRKPTransmissionSimulator(Simulator):
         self.F = pd.read_csv(f"{path}/floor_trace.csv", index_col=0).values
         self.R = pd.read_csv(f"{path}/room_trace.csv", index_col=0).values
         self.N, self.T = self.W.shape
-        self.d_x = self.T * 8 if self.het else self.T
-        self.flatten = flatten # only set this false for ABC comparison
+        self.L = np.repeat(np.array(SCALE)[:, None], self.T, axis=1)
+        if pi is not None:
+            if np.isscalar(pi):
+                self.pi = np.array([pi])
+            else:
+                self.pi = np.array(pi)
+        else:
+            self.pi = None
+        self.d_x = self.T * self.d_theta
+        self.flatten = flatten # set false for ABC
         if n_sample is not None:
             self.data, self.theta = self.simulate_data()
 
         self.x_o = self.load_observed_data(path)
-
         
 
     def set_prior(self, mu, sigma):
@@ -45,16 +53,16 @@ class CRKPTransmissionSimulator(Simulator):
         with open(f"{path}/observed_data.npy", "rb") as f:
             x = np.load(f)
         if self.het:
-            return torch.tensor(x)
+            return torch.tensor(x / self.L) # or don't scale, idk
         else:
             return torch.tensor(x[0,:]).unsqueeze(0)
 
     def get_observed_data(self):
-        x_o = self.x_o
+        obs = self.x_o
         if self.flatten:
-            return x_o.float().flatten().unsqueeze(0)
-        else:
-            return x_o.float()
+            obs =  obs.flatten().unsqueeze(0)
+            
+        return obs.float()
     
     def simulate_data(self):
         logbetas = self.sample_logbeta(self.n_sample, seed=5)
@@ -133,12 +141,12 @@ class CRKPTransmissionSimulator(Simulator):
 
         if self.het:
             floor_counts = []
-            for i in range(1,7):
+            for i in [1,2,3,4,6]:
                 # does this work with matrix indexing?
                 floor_count = np.nansum(X * (self.F == i), axis=0)
                 floor_counts.append(floor_count)
                 stats = [total_count] + floor_counts + [room_count]
-            data = torch.tensor(np.stack(stats)).float()
+            data = torch.tensor(np.stack(stats)).float() / self.L
         else:
             data =  torch.tensor(total_count).float()
 

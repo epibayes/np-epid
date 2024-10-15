@@ -71,12 +71,13 @@ crkp: &crkp
   prior_sigma: 1
   heterogeneous: False
   N: -1
+  pi: None
 
 crkp-het: # best run: d_model = 40
   <<: *crkp
   heterogeneous: true
-  prior_mu: [-2, -1, -1, -1, -1, -1, -1, 0]
-  prior_sigma: [1, 1, 1, 1, 1, 1, 1, 1]
+  prior_mu: [0, 0, 0, 0, 0, 0, 0] # [-2, -1, -1, -1, -1, -1, -1, 0]
+  prior_sigma: [1, 1, 1, 1, 1, 1, 1]
   flatten: True
 
 train:
