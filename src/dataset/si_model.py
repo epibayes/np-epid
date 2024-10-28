@@ -32,6 +32,7 @@ class SIModel(Simulator):
         self.T = T
         self.het = heterogeneous
         self.room = room
+        self.cap = np.array([N] + [60 for _ in range(5)] + [2])
         self.d_theta = 7 if self.het else 1
         assert self.d_theta == len(self.beta_true)
         self.set_prior(prior_mu, prior_sigma)
@@ -104,18 +105,18 @@ class SIModel(Simulator):
         for t in range(1, self.T):
             I = X[:, t-1]
             # components dependent on individual covariates
-            hazard = I.sum() * beta[0] * np.ones(self.N)
+            hazard = I.sum() * beta[0] * np.ones(self.N) / self.cap[0]
             if self.het:
-                hazard += (fC * I).sum(1) * beta[F+1]
+                hazard += (fC * I).sum(1) * beta[F+1] / self.cap[F+1]
                 infected_roommates = (rC * I).sum(1)
-                hazard += infected_roommates * beta[-1]
-                roommates_obs = (rC * Y[:, t-1]).sum(1)
+                hazard += infected_roommates * beta[-1] / self.cap[-1]
+                roommates_obs = (rC * Y[:, t-1]).sum(1) 
                 assert (roommates_obs <= infected_roommates).all()
                 if roommates_obs.max() == 0:
                     room_infect_density[t] = 1
                 else:
                     room_infect_density[t] = roommates_obs[roommates_obs > 0].mean()
-            p = 1 - np.exp(-hazard / self.N)
+            p = 1 - np.exp(-hazard)
             new_infections = np.random.binomial(1, p, self.N)
             X[:, t] = np.where(I, np.ones(self.N), new_infections)
             if self.eta == 1:
