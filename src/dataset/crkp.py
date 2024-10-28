@@ -81,7 +81,8 @@ class CRKPTransmissionSimulator(Simulator):
         beta = np.exp(logbeta)
         beta_0 = beta[0] if self.het else beta
         N, T = self.W.shape
-        beta = np.exp(logbeta)
+        if self.pi is not None:
+            beta = beta * self.pi
         X = np.empty((N, T))
         # load screen data for first day
         X[:, 0] = self.V[:, 0]
@@ -105,8 +106,6 @@ class CRKPTransmissionSimulator(Simulator):
             staying = self.W[:, t] * w
             # who was infected at the last timestep?
             Ia = x[w > 0]
-            if np.isnan(Ia).any():
-                1/0
             hazard = Ia.sum() * beta_0 * np.ones(N)
             if self.het:
                 fa = f[w > 0]
@@ -117,8 +116,6 @@ class CRKPTransmissionSimulator(Simulator):
                 ra = r[w > 0]
                 rC = contact_matrix(ra)
                 infected_roommates = (rC * Ia).sum(1)
-                # if infected_roommates.max() > 0:
-                #     room_infect_density[t] = infected_roommates[infected_roommates > 0].mean()
                 room_count[t-1] = (infected_roommates > 1).sum()
                 hazard[w > 0] += infected_roommates * beta[-1]
             p = 1 - np.exp(-hazard / N) # not the end of the world to normalize by size of population
