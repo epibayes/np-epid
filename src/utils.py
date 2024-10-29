@@ -131,7 +131,7 @@ def simulator(alpha, beta, gamma, N, T, seed, het=False):
         I = X[:, t-1]
         # components dependent on individual covariates
         hazard = compute_hazard(beta, I, N, F, fC, rC, het)
-        p = 1 - np.exp(-hazard / N)
+        p = 1 - np.exp(-hazard)
         new_infections = np.random.binomial(1, p, N)
         X[:, t] = np.where(I, np.ones(N), new_infections)
         discharge = np.random.binomial(1, gamma, N)
@@ -140,16 +140,15 @@ def simulator(alpha, beta, gamma, N, T, seed, het=False):
     return X
 
 def compute_hazard(beta, I, N, F, fC, rC, het):
-    hazard = I.sum() * beta[0] * np.ones(N)
+    hazard = I.sum() * beta[0] * np.ones(N) / N
     if het:
-        hazard += (fC * I).sum(1) * beta[F+1]
-        hazard += (rC * I).sum(1) * beta[-1]
+        hazard += (fC * I).sum(1) * beta[F+1] / 60
+        hazard += (rC * I).sum(1) * beta[-1] / 2
     return hazard
 
 def nll(beta, alpha, gamma, N, T, X, het):
     # beta = beta / np.array([1, 300, 300, 300, 300, 300, 300])
     return - x_loglikelihood(beta, alpha, gamma, N, T, X, het)
-
 
 def x_loglikelihood(beta, alpha, gamma, N, T, X, het=False):
     ans = np.log(
@@ -169,13 +168,13 @@ def x_loglikelihood(beta, alpha, gamma, N, T, X, het=False):
             gamma * alpha + (1 - gamma)
         )).sum()
         ans += (xt * (1 - xs)  * np.log(
-            gamma * alpha + (1 - gamma) * (1 - np.exp(- hazard / N))
+            gamma * alpha + (1 - gamma) * (1 - np.exp(- hazard))
         )).sum()
         ans += ((1 - xt) * xs  * np.log(
             gamma * (1 - alpha) + 1e-8
         )).sum()
         ans += ((1 - xt) * (1 - xs) * np.log(
-            gamma *(1 - alpha) + (1 - gamma) * (np.exp(- hazard/ N))
+            gamma *(1 - alpha) + (1 - gamma) * (np.exp(- hazard))
         )).sum()
     return ans
 
