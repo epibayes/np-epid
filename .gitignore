@@ -11,4 +11,4 @@ experiments.md
 *.csv
 *.png
 *.npy
-sandbox.ipynb
+*.ipynb

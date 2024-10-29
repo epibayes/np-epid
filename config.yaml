@@ -55,7 +55,7 @@ si-model-id:
   <<: *si-model
   beta_true: [0.15, 1e-8, 1e-8, 1e-8, 1e-8, 1e-8, 1e-8]
   prior_mu: [-4, -4, -4, -4, -4, -4, -4] 
-  prior_sigma: [1, 1, 1, 1, 1, 1, 1]-
+  prior_sigma: [1, 1, 1, 1, 1, 1, 1]
   heterogeneous: True
 
 si-model-partial:
