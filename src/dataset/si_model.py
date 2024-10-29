@@ -99,12 +99,11 @@ class SIModel(Simulator):
         # seed initial infections
         X[:, 0] = np.random.binomial(1, self.alpha, self.N)
         Y[:, 0] = X[:, 0]
-        room_infect_density = np.ones(self.T)
+        room_count = np.ones(self.T)
         fC = contact_matrix(F)
         rC = contact_matrix(R)
         for t in range(1, self.T):
             I = X[:, t-1]
-            # components dependent on individual covariates
             hazard = I.sum() * beta[0] * np.ones(self.N) / self.cap[0]
             if self.het:
                 hazard += (fC * I).sum(1) * beta[F+1] / self.cap[F+1]
@@ -112,10 +111,7 @@ class SIModel(Simulator):
                 hazard += infected_roommates * beta[-1] / self.cap[-1]
                 roommates_obs = (rC * Y[:, t-1]).sum(1) 
                 assert (roommates_obs <= infected_roommates).all()
-                if roommates_obs.max() == 0:
-                    room_infect_density[t] = 1
-                else:
-                    room_infect_density[t] = roommates_obs[roommates_obs > 0].mean()
+                room_count[t-1] = (roommates_obs > 1).sum()
             p = 1 - np.exp(-hazard)
             new_infections = np.random.binomial(1, p, self.N)
             X[:, t] = np.where(I, np.ones(self.N), new_infections)
@@ -128,21 +124,29 @@ class SIModel(Simulator):
                 observed,
                 Y[:, t-1]
             )
+            if self.eta == 1:
+                assert (X[:, t] == Y[:, t]).all()
             # if someone is not yet infected, simulate transmission event
             discharge = np.random.binomial(1, self.gamma, size=self.N)
             screening = np.random.binomial(1, self.alpha, self.N)
             X[:, t] = np.where(discharge, screening, X[:, t])
             Y[:, t] = np.where(discharge, screening, Y[:, t])
+            
+        if self.het:
+            roommates_obs = (rC * Y[:, -1]).sum(1)
+            room_count[-1] = (roommates_obs > 1).sum()
 
         Y = torch.tensor(Y).float() # make it all float for good measure
         # is it as simple as offsetting by first element of A?
         w = None if self.summarize else 0
         total_count = Y.mean(w)
         if self.het:
+            # TODO: make sure everything is on the same scale
             floor_counts = [Y[F == i].mean(w) for i in range(5)]
             if self.summarize:
-                room_infect_density = room_infect_density.mean()
-            data =  torch.stack([total_count] + floor_counts + [torch.tensor(room_infect_density)])
+                room_count = room_count.mean()
+            room_count = room_count / self.N
+            data =  torch.stack([total_count] + floor_counts + [torch.tensor(room_count)])
         else:
             data = total_count
             

@@ -8,7 +8,6 @@ def main():
     beta_true = np.array([.05, .02, .04, .06, .08, .1, .05])
     alpha = 0.1
     gamma = 0.05
-    heterogeneous = True
     N = 300 # consider increasing
     T = 52
     K = 30
@@ -47,7 +46,7 @@ def main():
     
     print(attempts)
     
-    np.save("posterior_sample2", sample)
+    np.save("posterior_sample", sample)
 
 if __name__ == "__main__":
     main()
