@@ -61,7 +61,6 @@ si-model-id:
 si-model-partial: # best run: d_model 80, wd 0.01
   <<: *si-model-het
   eta: 0.1
-  gamma: 0.02
 
 crkp: &crkp
   <<: *simulator
