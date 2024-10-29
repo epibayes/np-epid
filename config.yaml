@@ -1,7 +1,7 @@
 experiment:
 
 simulator: &simulator
-  n_sample: 5000
+  n_sample: 1000
   observed_seed: 5
 
 
@@ -43,19 +43,19 @@ si-model: &si-model
 
 si-model-het: &si-model-het
   <<: *si-model
-  beta_true: [0.05, .1, .2, .3, .4, .5, 5]
-  prior_mu: [-3, -1.5, -1.5, -1.5, -1.5, -1.5, 1]
+  beta_true: [.05, .02, .04, .06, .08, .1, .05]
+  prior_mu: [-3, -3, -3, -3, -3, -3, -3]
   prior_sigma: [1, 1, 1, 1, 1, 1, 1]
   heterogeneous: True
   observed_seed: 31
   N: 300
-  gamma: 0.02
+  gamma: 0.05
 
 si-model-id:
   <<: *si-model
   beta_true: [0.15, 1e-8, 1e-8, 1e-8, 1e-8, 1e-8, 1e-8]
-  prior_mu: [-4, -4, -4, -4, -4, -4, -4] # [-3, -1.5, -1.5, -1.5, -1.5, -1.5, 1]
-  prior_sigma: [1, 1, 1, 1, 1, 1, 1] # [2, 2, 2, 2, 2, 2, 2]
+  prior_mu: [-4, -4, -4, -4, -4, -4, -4] 
+  prior_sigma: [1, 1, 1, 1, 1, 1, 1]
   heterogeneous: True
 
 si-model-partial:
@@ -71,12 +71,13 @@ crkp: &crkp
   prior_sigma: 1
   heterogeneous: False
   N: -1
+  pi: None
 
 crkp-het: # best run: d_model = 40
   <<: *crkp
   heterogeneous: true
-  prior_mu: [-2, -1, -1, -1, -1, -1, -1, 0]
-  prior_sigma: [1, 1, 1, 1, 1, 1, 1, 1]
+  prior_mu: [0, 0, 0, 0, 0, 0, 0]
+  prior_sigma: [1, 1, 1, 1, 1, 1, 1]
   flatten: True
 
 train:
