@@ -8,8 +8,9 @@ from ..utils import contact_matrix
 class SIModel(Simulator):
     def __init__(self, alpha, gamma, beta_true, heterogeneous,
                  prior_mu, prior_sigma,  N, T, summarize=False,
-                 observed_seed=None, room=False, n_sample=None,
-                 flatten=True, pi=None, eta = None):
+                 observed_seed=None, room=False, log_scale=True,
+                 n_sample=None, flatten=True, pi=None, eta = None):
+        self.log_scale = log_scale
         self.alpha = alpha # baseline proportion infected in pop
         self.gamma = gamma # discharge rate
         if np.isscalar(beta_true):
@@ -58,22 +59,26 @@ class SIModel(Simulator):
             return
 
     def simulate_data(self):
-        logbetas = self.sample_logbeta(self.n_sample, seed=5)
+        thetas = self.sample_logbeta(self.n_sample, seed=5)
+        if not self.log_scale:
+            thetas = np.exp(thetas)
         xs = torch.empty((self.n_sample, self.d_x))
         for i in range(self.n_sample):
             random_seed = 5 * i
             xs[i] = self.SI_simulator(
-                np.array(logbetas[i]),
+                np.array(thetas[i]),
                 random_seed,
             ).flatten()
 
-        return xs, logbetas.float()
+        return xs, thetas.float()
     
     def get_observed_data(self, observed_seed=None):
         if observed_seed is None:
             observed_seed = self.obs
-        logbeta_true = np.log(np.array(self.beta_true))
-        x_o = self.SI_simulator(np.array(logbeta_true), observed_seed)
+        theta_true = np.array(self.beta_true)
+        if self.log_scale:
+            theta_true = np.log(theta_true)
+        x_o = self.SI_simulator(theta_true, observed_seed)
         if self.summarize:
             x_o = x_o.unsqueeze(0)
         if not self.het:
@@ -82,8 +87,11 @@ class SIModel(Simulator):
             x_o = x_o.unsqueeze(0)
         return x_o.float()
 
-    def SI_simulator(self, logbeta, seed=None):
-        beta = np.exp(logbeta)
+    def SI_simulator(self, theta, seed=None):
+        if self.log_scale:
+            beta = np.exp(theta)
+        else:
+            beta = theta
         if len(beta) == 1:
             beta = np.array(((beta[0],)))
         assert len(beta) == self.d_theta
@@ -141,7 +149,6 @@ class SIModel(Simulator):
         w = None if self.summarize else 0
         total_count = Y.mean(w)
         if self.het:
-            # TODO: make sure everything is on the same scale
             floor_counts = [Y[F == i].mean(w) for i in range(5)]
             if self.summarize:
                 room_count = room_count.mean()

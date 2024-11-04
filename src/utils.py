@@ -61,18 +61,13 @@ def save_results(posterior_params, val_losses, cfg):
         L = posterior_params[1]
         sigma = (L @ L.T).tolist()
         sdiag = (L @ L.T).diag().tolist()
-        lognormal_mean = np.exp(
-            np.array(mu) + np.array(sdiag) / 2
-        )
-        print(np.round(lognormal_mean, 3))
-        print(np.round(mu, 3))
-        print(np.round(sdiag, 3))
+        print(np.round(mu, 5))
+        print(np.round(sdiag, 5)) # marginal variances
         prior_mu = list(cfg[cfg.experiment]["prior_mu"])
         prior_sigma = list(cfg[cfg.experiment]["prior_sigma"])
     else:
         mu = posterior_params[0].item()
         sigma = posterior_params[1].item()
-        print(np.round(np.exp(mu + sigma**2 / 2), 3))
         print(np.round(mu, 3))
         print(np.round(sigma, 3))
         prior_mu = cfg[cfg.experiment]["prior_mu"]
