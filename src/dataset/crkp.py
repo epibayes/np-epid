@@ -13,6 +13,7 @@ class CRKPTransmissionSimulator(Simulator):
                  flatten=False, N=False, pi=None):
         self.n_sample = n_sample
         self.het = heterogeneous
+        self.cap = np.array(SCALE)
         self.d_theta = 7 if self.het else 1 # five* floors, facility and room level transmission rates
         self.set_prior(prior_mu, prior_sigma)
         # who is present when?
@@ -106,19 +107,19 @@ class CRKPTransmissionSimulator(Simulator):
             staying = self.W[:, t] * w
             # who was infected at the last timestep?
             Ia = x[w > 0]
-            hazard = Ia.sum() * beta_0 * np.ones(N)
+            hazard = Ia.sum() * beta_0 * np.ones(N) / self.cap[0]
             if self.het:
                 fa = f[w > 0]
                 fC = contact_matrix(fa)
                 # guarantee that there are no infecteds who aren't present
                 # how many infected floormates?
-                hazard[w > 0] += (fC * Ia).sum(1) * beta[fa]
+                hazard[w > 0] += (fC * Ia).sum(1) * beta[fa] / self.cap[fa]
                 ra = r[w > 0]
                 rC = contact_matrix(ra)
                 infected_roommates = (rC * Ia).sum(1)
                 room_count[t-1] = (infected_roommates > 1).sum()
-                hazard[w > 0] += infected_roommates * beta[-1]
-            p = 1 - np.exp(-hazard / N) # not the end of the world to normalize by size of population
+                hazard[w > 0] += infected_roommates * beta[-1] / self.cap[-1]
+            p = 1 - np.exp(-hazard) # not the end of the world to normalize by size of population
             X[:, t] = np.where(staying * (x == 0), np.random.binomial(1, p, N), X[:, t])
 
         if self.het:
@@ -131,8 +132,6 @@ class CRKPTransmissionSimulator(Simulator):
             Ia = x[w > 0]
             infected_roommates = (rC * Ia).sum(1)
             room_count[T-1] = (infected_roommates > 1).sum()
-            
-            
 
         total_count = np.nansum(X, axis=0)
 
