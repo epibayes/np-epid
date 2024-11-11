@@ -51,6 +51,7 @@ si-model-het: &si-model-het
   observed_seed: 31
   N: 300
   gamma: 0.05
+  log_scale: False
 
 si-model-id:
   <<: *si-model
@@ -58,10 +59,12 @@ si-model-id:
   prior_mu: [-4, -4, -4, -4, -4, -4, -4] 
   prior_sigma: [1, 1, 1, 1, 1, 1, 1]
   heterogeneous: True
+  log_scale: False
 
 si-model-partial: # best run: d_model 80, wd 0.01
   <<: *si-model-het
   eta: 0.1
+  log_scale: False
 
 crkp: &crkp
   <<: *simulator
@@ -85,9 +88,9 @@ train:
   batch_size:
   # random seed for train-validation split
   seed: 11
-  max_epochs: 500
+  max_epochs: 1000
   log_freq: 4
-  patience: 10
+  patience: 50
   stop_early: True
   devices: auto
 
