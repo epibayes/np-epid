@@ -1,5 +1,5 @@
 import numpy as np
-from src.utils import contact_matrix, simulator, nll, x_loglikelihood
+from src.utils import simulator, nll, x_loglikelihood
 from scipy.optimize import minimize
 from scipy.stats import norm, multivariate_normal
       
@@ -12,10 +12,8 @@ def main():
     T = 52
     K = 30
     
-    F = np.arange(N) % 5
-    R = np.arange(N) % (N // 2)
-    fC = contact_matrix(F)
-    rC = contact_matrix(R)
+    # F = np.arange(N) % 5
+    # R = np.arange(N) % (N // 2)
     
     X_o = simulator(alpha, beta_true, gamma, N, T, seed=31, het=True)
     
@@ -23,6 +21,7 @@ def main():
         nll, x0 = beta_true, args = (alpha, gamma, N, T, X_o, True),
         bounds = [(0.0, None) for _ in range(7)], tol=0.0001
     )
+    
     
     prior_mu = np.array([-3, -3, -3, -3, -3, -3, -3])
 
