@@ -1,3 +1,3 @@
-### Neural Posterior Estimation for Simulation-based Inference in Transmission Modeling
+# npe-sidm
 
-Prayag Chatha
+Neural Posterior Estimation for Stochastic Infectious Disease Modeling
