@@ -52,11 +52,9 @@ class SIModel(Simulator):
         if self.d_theta == 1:
             self.prior_mu = mu
             self.prior_sigma = sigma
-            return
         else:
-            self.prior_mu = torch.tensor(mu).float()
-            self.prior_sigma = torch.diag(torch.tensor(sigma)).float()
-            return
+            self.prior_mu = torch.full((7,), mu).float()
+            self.prior_sigma = torch.diag(torch.full((7,), sigma)).float()
 
     def simulate_data(self):
         thetas = self.sample_logbeta(self.n_sample, seed=5)
