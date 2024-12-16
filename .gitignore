@@ -11,4 +11,4 @@ experiments.md
 *.csv
 *.png
 *.npy
-*.ipynb
+notebooks/old
