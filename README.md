@@ -1,3 +1,3 @@
-# npe-sidm
+# npe-sem
 
-Neural Posterior Estimation for Stochastic Infectious Disease Modeling
+Neural Posterior Estimation for Stochastic Epidemic Modeling
