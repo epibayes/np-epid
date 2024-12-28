@@ -1,5 +1,6 @@
 import torch
 import lightning as L
+from torch.nn import ReLU, Tanh, Linear, Sequential
 
 class BaseFlow(L.LightningModule):
     def __init__(self, lr, weight_decay, dist=None,):
@@ -23,7 +24,7 @@ class BaseFlow(L.LightningModule):
     
 
     def log_prob(self, Z, log_det):
-        prob_Z = self.dist.log_prob(Z).sum(dim=1) # why summation?
+        prob_Z = self.dist.log_prob(Z).sum(dim=1) # sum across latent dimensions
         prob_X = prob_Z + log_det
         return prob_X
 
@@ -56,11 +57,105 @@ class BaseFlow(L.LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.wd)
+    
+class CouplingFlow(BaseFlow):
 
+    def __init__(
+        self, d, n_hidden, mask, num_cond_inputs=None
+    ):
+        super().__init__()
 
-# class SequentialFlow(GenericFlow):
-#     def __init__(self, d, flows: nn.Sequential, dist=None, lr=1e-3):
-#         super().__init__(d=d, dist=dist, lr=lr)
+        self.n_hidden = n_hidden
+        self.register_buffer("mask", mask.float())
+
+        s_act_func = Tanh # why Tanh though...
+        t_act_func = ReLU
+
+        if num_cond_inputs is not None:
+            total_inputs = d + num_cond_inputs
+        else:
+            total_inputs = d
+
+        self.scale_net = Sequential(
+            Linear(total_inputs, n_hidden),
+            s_act_func(),
+            Linear(n_hidden, n_hidden),
+            s_act_func(),
+            Linear(n_hidden, d),
+        )
+        self.translate_net = Sequential(
+            Linear(total_inputs, n_hidden),
+            t_act_func(),
+            Linear(n_hidden, n_hidden),
+            t_act_func(),
+            Linear(n_hidden, d),
+        )
+
+    def forward(self, X, Y):
+        masked_X = X * self.mask
+        if Y is not None:
+            masked_X = torch.cat([masked_X, Y], -1)
+        log_s = self.scale_net(masked_X) * (1 - self.mask)
+        t = self.translate_net(masked_X) * (1 - self.mask)
+        s = torch.exp(log_s)
+        return X * s + t, log_s.sum(-1)
+
+    def backward(self, U, Y=None):
+        masked_U = U * self.mask
+        if Y is not None:
+            masked_U = torch.cat([masked_U, Y], -1)
+        log_s = self.scale_net(masked_U) * (1 - self.mask)
+        t = self.translate_net(masked_U) * (1 - self.mask)
+        s_reciprocal = torch.exp(-log_s)
+        # why is this the inverse...
+        # because s and t are computed on the *masked* [portion]
+        return (U - t) * s_reciprocal
+    
+class RealNVP(BaseFlow):
+
+    def __init__(
+        self,
+        d,
+        n_layers,
+        n_hidden,
+        num_cond_inputs=None,
+        # reverse_batch_norm=False,
+        lr=1e-3,
+    ):
+        mask = torch.arange(0, d) % 2 # alternating bit mask
+        flows = torch.nn.ModuleList()
+        # TODO do i need to standardize?
+        # if (mu is not None) and (sigma is not None):
+        #     flows.append(StandardizationFlow(mu, sigma))
+        # if reverse_batch_norm:
+        #     BNF = BatchNormFlowReversed
+        # else:
+        #     BNF = BatchNormFlow
+        for _ in range(n_layers):
+            flows.append(
+                CouplingFlow(d, n_hidden, mask, num_cond_inputs)
+            )
+            # flows.append(BNF(d))
+            mask = 1 - mask # flip the bit mask
+        super().__init__()
+        
+    def forward(self, X, Y=None):
+        log_det_sum = torch.zeros(X.size(0)) # device=U.device
+        for module in self.flows:
+            Z, log_det = module.forward(X, Y)
+            log_det_sum += log_det
+            X = Z
+        return Z, log_det_sum
+
+    def inverse(self, Z, Y=None):
+        for module in reversed(self.flows):
+            X = module.backward(Z, Y=None)
+            Z = X
+        return X
+
+# class RealNVP(BaseFlow):
+#     def __init__(self, d, flows: Sequential, dist=None, lr=1e-3):
+#         super().__init__()
 #         self.flows = flows
 
 #     def direct(self, X, cond_inputs=None):
@@ -80,6 +175,8 @@ class BaseFlow(L.LightningModule):
 #             X, log_dets_step = module.inverse(U, cond_inputs=cond_inputs)
 #             log_dets += log_dets_step
 #         return X, log_dets
+
+
     
 # class BatchNormFlow(GenericFlow):
 #     """"""
@@ -87,8 +184,8 @@ class BaseFlow(L.LightningModule):
 #     def __init__(self, d, momentum=0.0, eps=1e-5):
 #         super().__init__(d=d)
 
-#         self.log_gamma = nn.Parameter(torch.zeros(d))
-#         self.beta = nn.Parameter(torch.zeros(d))
+#         self.log_gamma = Parameter(torch.zeros(d))
+#         self.beta = Parameter(torch.zeros(d))
 #         self.momentum = momentum
 #         self.eps = eps
 
@@ -125,58 +222,7 @@ class BaseFlow(L.LightningModule):
 #         return y, (-self.log_gamma + 0.5 * torch.log(var)).sum(-1, keepdim=True)
     
     
-# class CouplingFlow(GenericFlow):
-#     """"""
 
-#     def __init__(
-#         self, d, n_hidden, mask, num_cond_inputs=None, s_act="tanh", t_act="relu"
-#     ):
-#         super().__init__(d=d)
-
-#         self.n_hidden = n_hidden
-#         self.register_buffer("mask", mask.float())
-
-#         activations = {"relu": nn.ReLU, "sigmoid": nn.Sigmoid, "tanh": nn.Tanh}
-#         s_act_func = activations[s_act]
-#         t_act_func = activations[t_act]
-
-#         if num_cond_inputs is not None:
-#             total_inputs = d + num_cond_inputs
-#         else:
-#             total_inputs = d
-
-#         self.scale_net = nn.Sequential(
-#             nn.Linear(total_inputs, n_hidden),
-#             s_act_func(),
-#             nn.Linear(n_hidden, n_hidden),
-#             s_act_func(),
-#             nn.Linear(n_hidden, d),
-#         )
-#         self.translate_net = nn.Sequential(
-#             nn.Linear(total_inputs, n_hidden),
-#             t_act_func(),
-#             nn.Linear(n_hidden, n_hidden),
-#             t_act_func(),
-#             nn.Linear(n_hidden, d),
-#         )
-
-#     def direct(self, X, cond_inputs=None):
-#         masked_X = X * self.mask
-#         if cond_inputs is not None:
-#             masked_X = torch.cat([masked_X, cond_inputs], -1)
-#         log_s = self.scale_net(masked_X) * (1 - self.mask)
-#         t = self.translate_net(masked_X) * (1 - self.mask)
-#         s = torch.exp(log_s)
-#         return X * s + t, log_s.sum(-1)
-
-#     def inverse(self, U, cond_inputs=None):
-#         masked_U = U * self.mask
-#         if cond_inputs is not None:
-#             masked_U = torch.cat([masked_U, cond_inputs], -1)
-#         log_s = self.scale_net(masked_U) * (1 - self.mask)
-#         t = self.translate_net(masked_U) * (1 - self.mask)
-#         s_reciprocal = torch.exp(-log_s)
-#         return (U - t) * s_reciprocal, -log_s.sum(-1)
 
 
 # class BatchNormFlowReversed(BatchNormFlow):
@@ -223,7 +269,6 @@ class BaseFlow(L.LightningModule):
 #     ):
 #         mask = torch.arange(0, d) % 2
 #         flows = []
-#         # TODO do i need to standardize?
 #         # or do i already handle this in the preprocessing phase
 #         if (mu is not None) and (sigma is not None):
 #             flows.append(StandardizationFlow(mu, sigma))
@@ -239,7 +284,7 @@ class BaseFlow(L.LightningModule):
 #             )
 #             flows.append(BNF(d))
 #             mask = 1 - mask
-#         super().__init__(d, nn.Sequential(*flows), lr=lr)
+#         super().__init__(d, Sequential(*flows), lr=lr)
 #         self.d = d
 #         self.n_layers = n_layers
 #         self.n_hidden = n_hidden
