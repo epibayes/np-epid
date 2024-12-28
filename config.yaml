@@ -86,6 +86,7 @@ train:
   stop_early: True
   devices: auto
 
+# TODO: think of a way to switch between a GDN and a normalizing flow
 model:
   _target_: src.model.GaussianDensityNetwork
   d_model: 32

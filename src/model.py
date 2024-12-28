@@ -90,6 +90,8 @@ class GaussianDensityNetwork(L.LightningModule):
     
 
     def predict_step(self, x):
-        # this returns standard deviation!
+        # this returns standard deviation
         mu, sigma = self(x)
         return mu, sigma
+    
+    # TODO would it make sense to have a "sample" method?
