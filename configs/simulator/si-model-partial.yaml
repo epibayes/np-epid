@@ -1,0 +1,5 @@
+defaults:
+  - si-model-het
+  
+eta: 0.1
+log_scale: False

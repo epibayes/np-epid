@@ -15,20 +15,19 @@ def test_npe_sim_partial():
 
         
         
-def _test(experiment):
-    with initialize(config_path=".."):
+def _test(simulator):
+    with initialize(config_path="../configs"):
         cfg = compose(
             config_name="config",
             overrides=[
-                f"experiment={experiment}",
+                f"simulator={simulator}",
                 "train.max_epochs=10",
-                f"{experiment}.n_sample=100"
+                "simulator.n_sample=250"
             ],
         )
-    data_cfg = cfg[cfg.experiment]
-    dataset = instantiate(data_cfg)
+    dataset = instantiate(cfg.simulator)
     observed_data = dataset.get_observed_data()
-    batch_size = data_cfg.n_sample
+    batch_size = cfg.simulator.n_sample
     datamodule = DataModule(
         dataset, cfg.train.seed, batch_size, cfg.train.train_frac
         )

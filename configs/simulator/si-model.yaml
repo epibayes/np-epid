@@ -1,0 +1,14 @@
+_target_: src.dataset.SIModel
+alpha: 0.1 #baseline proportion infected 
+gamma: 0.05 # discharge rate
+beta_true: 0.15 # true infection rate
+prior_mu: -3
+prior_sigma: 1
+N: 100 # num patients
+T: 52 # num timesteps
+log_scale: True
+summarize: False
+observed_seed: 29
+heterogeneous: False
+pi:
+eta:

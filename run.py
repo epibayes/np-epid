@@ -20,8 +20,11 @@ def main(cfg=None):
         dataset, cfg.train.seed, batch_size, cfg.train.train_frac
         )
     model = instantiate(cfg.model, dataset.d_x, dataset.d_theta)
-    wandb.init(reinit=False)
-    logger = WandbLogger(project='crkp')
+    if cfg.log:
+        wandb.init(reinit=False)
+        logger = WandbLogger(project='crkp')
+    else:
+        logger = None
 
     if cfg.train.stop_early:
         callbacks = callbacks=[EarlyStopping(monitor="val_loss", mode="min", patience=cfg.train.patience)]

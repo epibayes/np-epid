@@ -1,7 +1,7 @@
 defaults:
   - _self_
   - model: gdn
-  - simulator: normal-normal
+  - simulator:
 
 simulator:
   n_sample: 4000
@@ -21,6 +21,8 @@ train:
 model:
   lr: 0.001
   weight_decay: 0.0
+
+log: False
 
 
 hydra:

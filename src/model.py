@@ -1,6 +1,6 @@
 import lightning as L
 import torch
-from torch.nn import Linear, Dropout, ReLU
+from torch.nn import Linear, ReLU
 from torch.distributions.normal import Normal
 from torch.distributions.multivariate_normal import MultivariateNormal
 
