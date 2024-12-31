@@ -1,0 +1,91 @@
+defaults:
+  - _self_
+  - model: gdn
+  - simulator: normal-normal
+
+simulator:
+  n_sample: 4000
+  observed_seed: 5
+
+train:
+  train_frac: 0.75
+  batch_size:
+  # random seed for train-validation split
+  seed: 11
+  max_epochs: 1000
+  log_freq: 4
+  patience: 50
+  stop_early: True
+  devices: auto
+
+model:
+  lr: 0.001
+  weight_decay: 0.0
+
+
+hydra:
+  job:
+    chdir: True
+
+
+# si-model: &si-model
+#   _target_: src.dataset.SIModel
+#   <<: *simulator
+#   alpha: 0.1 #baseline proportion infected 
+#   gamma: 0.05 # discharge rate
+#   beta_true: 0.15 # true infection rate
+#   prior_mu: -3
+#   prior_sigma: 1
+#   N: 100 # num patients
+#   T: 52 # num timesteps
+#   log_scale: True
+#   summarize: False
+#   observed_seed: 29
+#   heterogeneous: False
+#   pi:
+#   eta:
+
+# si-model-het: &si-model-het
+#   <<: *si-model
+#   beta_true: [.05, .02, .04, .06, .08, .1, .05]
+#   prior_mu: -3
+#   prior_sigma: 1
+#   heterogeneous: True
+#   observed_seed: 31
+#   N: 300
+#   gamma: 0.05
+#   log_scale: False
+
+# si-model-partial: # best run: d_model 80, wd 0.01
+#   <<: *si-model-het
+#   eta: 0.1
+#   log_scale: False
+
+# crkp: &crkp
+#   <<: *simulator
+#   _target_: src.dataset.crkp.CRKPTransmissionSimulator
+#   path: /Volumes/umms-esnitkin/Project_KPC_LTACH/Analysis/LTACH_transmission_modeling/preprocessed/resampled
+#   prior_mu: -2
+#   prior_sigma: 1
+#   heterogeneous: False
+#   N: -1
+#   pi:
+
+# crkp-het:
+#   <<: *crkp
+#   heterogeneous: true
+#   prior_mu: -3
+#   prior_sigma: 1
+#   flatten: True
+
+
+
+# # TODO: think of a way to switch between a GDN and a normalizing flow
+# model:
+#   _target_: src.model.GaussianDensityNetwork
+#   d_model: 32
+#   lr: 0.001
+#   dropout: 0.0
+#   weight_decay: 0.0
+#   mean_field: False
+

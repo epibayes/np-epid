@@ -6,42 +6,13 @@ from .simulator import Simulator
 
 COEFFS = torch.tensor([1.45, 1.79, 0.49])
 
-class TestDataset(Simulator):
-    # can the density network learn a simple gaussian?
-    def __init__(self, n_sample, random_state):
-        self.n_sample = n_sample
-        self.d_x = 5
-        self.d_theta = 1
-        self.random_state = random_state
-        self.data, self.theta = self.simulate_data()
-
-
-    
-    def simulate_data(self):
-        torch.manual_seed(self.random_state)
-        theta = torch.normal(1, 1, (self.n_sample,))
-        x = torch.normal(0, 3, (self.n_sample, 5))
-        return x, theta.unsqueeze(1)
-    
-    def get_observed_data(self):
-        torch.manual_seed(self.random_state)
-        return torch.normal(0,1, size=(1, 5))
-    
-    def evaluate(self, posterior_params):
-        mu, sigma = posterior_params
-        mu_mse = ((mu - 1) ** 2).mean().item()
-        sigma_mse = ((sigma - 1)**2).mean().item()
-        print(f"mu, MSE: {mu_mse:.3f}")
-        print(f"sigma, MSE: {sigma_mse:.3f}")
-
-
 
 class NormalNormalDataset(Simulator):
-    def __init__(self, n_obs, n_sample, random_state, shrinkage, noise, dimension):
+    def __init__(self, n_obs, n_sample, observed_seed, shrinkage, noise, dimension):
         if dimension > 3:
             raise ValueError("Test case designed for dimensions < 4")
         self.n_sample = n_sample
-        self.random_state = random_state
+        self.observed_seed = observed_seed
         self.n_obs = n_obs # something small, like 10 i think
         self.shrinkage = shrinkage # l2 penalty: *std* of prior
         self.noise = noise # *std* of observational error
@@ -54,8 +25,8 @@ class NormalNormalDataset(Simulator):
     
 
     def simulate_data(self):
-        np.random.seed(self.random_state)
-        torch.manual_seed(self.random_state)
+        np.random.seed(10)
+        torch.manual_seed(10)
         p = self.d_theta
         mu_0 = torch.zeros(p)
         Sigma_0 = self.shrinkage**2 * torch.eye(p)
@@ -77,7 +48,7 @@ class NormalNormalDataset(Simulator):
         return xs.float(), mus.float()
     
     def get_observed_data(self):
-        torch.manual_seed(self.random_state)
+        torch.manual_seed(self.observed_seed)
         p = self.d_theta
         if p == 1:
             x_o = torch.normal(
@@ -113,11 +84,11 @@ class NormalNormalDataset(Simulator):
 
 
 class BayesLinRegDataset(Simulator):
-    def __init__(self, n_obs, n_sample, random_state, shrinkage, noise, dimension):
+    def __init__(self, n_obs, n_sample, observed_seed, shrinkage, noise, dimension):
         if dimension > 3:
             raise ValueError("Test case designed for dimensions < 4")
         self.n_sample = n_sample
-        self.random_state = random_state
+        self.observed_seed = observed_seed
         self.n_obs = n_obs # something small, like 10 i think
         self.shrinkage = shrinkage # l2 penalty--smaller shrinks more
         self.noise = noise
@@ -128,8 +99,9 @@ class BayesLinRegDataset(Simulator):
         self.data, self.theta = self.simulate_data()
 
     def simulate_data(self):
-        np.random.seed(self.random_state)
-        torch.manual_seed(self.random_state)
+        # might be nice not to hard code this
+        np.random.seed(9)
+        torch.manual_seed(9)
         p = self.d_theta
         m_0 = torch.zeros(p)
         S_0 = self.shrinkage**2 * torch.eye(p)
@@ -169,8 +141,8 @@ class BayesLinRegDataset(Simulator):
         return m_N, S_N
     
     def get_observed_data(self):
-        np.random.seed(self.random_state)
-        torch.manual_seed(self.random_state)
+        np.random.seed(self.observed_seed)
+        torch.manual_seed(self.observed_seed)
         X = np.random.uniform(low = -5, high=5, size=(self.n_obs, self.d_theta))
         y_o = torch.normal(
             torch.tensor((self.theta_true @ X.T)).clone().detach(),

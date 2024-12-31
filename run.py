@@ -6,15 +6,14 @@ from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from hydra.utils import instantiate
 from src.utils import DataModule, save_results
 
-TOY_EXPERIMENTS = ("test-dataset", "normal-normal", "bayes-linreg")
+TOY_EXPERIMENTS = ("normal-normal", "bayes-linreg")
 
-@hydra.main(config_path=".", config_name="config.yaml", version_base=None)
+@hydra.main(config_path="configs", config_name="config.yaml", version_base=None)
 def main(cfg=None):
-    data_cfg = cfg[cfg.experiment]
-    dataset = instantiate(data_cfg)
+    dataset = instantiate(cfg.simulator)
     observed_data = dataset.get_observed_data()
     if cfg.train.batch_size is None:
-        batch_size = data_cfg.n_sample
+        batch_size = cfg.simulator.n_sample
     else:
         batch_size = cfg.train.batch_size
     datamodule = DataModule(
