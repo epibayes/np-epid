@@ -1,12 +1,12 @@
 import torch
 import lightning as L
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, Dataset, random_split
 import yaml
 import numpy as np
 import pandas as pd
 import glob
+from sklearn.datasets import make_moons
 
-# theoretically, variational dropout takes care of overfitting
 class DataModule(L.LightningDataModule):
     def __init__(self, dataset, seed, batch_size, train_frac):
         super().__init__()
@@ -180,3 +180,19 @@ def lognormal_sd(log_mean, log_sd):
     a = np.exp(log_sd**2) - 1
     b = np.exp(2*log_mean + log_sd**2)
     return (a*b)**0.5
+
+class MoonsDataset(Dataset):
+    def __init__(self, n_sample, random_state):
+        self.n_sample = n_sample
+        self.random_state = random_state
+        self.data = self._make_data()
+
+    def _make_data(self):
+        arr = make_moons(self.n_sample, noise=0.05, random_state=self.random_state)[0]
+        return torch.from_numpy(arr)
+
+    def __len__(self):
+        return self.n_sample
+    
+    def __getitem__(self, index):
+        return self.data[index]

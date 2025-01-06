@@ -5,11 +5,7 @@ from torch.nn import ReLU, Tanh, Linear, Sequential
 class BaseFlow(L.LightningModule):
     def __init__(self, lr, weight_decay, dist=None,):
         super().__init__()
-        # latent distribution
-        if dist is None:
-            dist = torch.distributions.Normal(torch.tensor(0.0), torch.tensor(1.0))
-        # self.d = d
-        self.dist = dist
+        self.dist = dist # distribution of latents
         self.lr = lr
         self.wd = weight_decay
 
@@ -61,37 +57,35 @@ class BaseFlow(L.LightningModule):
 class CouplingFlow(BaseFlow):
 
     def __init__(
-        self, d, n_hidden, mask, num_cond_inputs=None
+        self, d_x, d_model, mask, d_cond=0
     ):
         super().__init__()
 
-        self.n_hidden = n_hidden
+        self.d_model = d_model
         self.register_buffer("mask", mask.float())
 
         s_act_func = Tanh # why Tanh though...
         t_act_func = ReLU
 
-        if num_cond_inputs is not None:
-            total_inputs = d + num_cond_inputs
-        else:
-            total_inputs = d
+        total_inputs = d_x + d_cond
+
 
         self.scale_net = Sequential(
-            Linear(total_inputs, n_hidden),
+            Linear(total_inputs, d_model),
             s_act_func(),
-            Linear(n_hidden, n_hidden),
+            Linear(d_model, d_model),
             s_act_func(),
-            Linear(n_hidden, d),
+            Linear(d_model, d_x),
         )
         self.translate_net = Sequential(
-            Linear(total_inputs, n_hidden),
+            Linear(total_inputs, d_model),
             t_act_func(),
-            Linear(n_hidden, n_hidden),
+            Linear(d_model, d_model),
             t_act_func(),
-            Linear(n_hidden, d),
+            Linear(d_model, d_x),
         )
 
-    def forward(self, X, Y):
+    def forward(self, X, Y=None):
         masked_X = X * self.mask
         if Y is not None:
             masked_X = torch.cat([masked_X, Y], -1)
@@ -100,31 +94,29 @@ class CouplingFlow(BaseFlow):
         s = torch.exp(log_s)
         return X * s + t, log_s.sum(-1)
 
-    def backward(self, U, Y=None):
-        masked_U = U * self.mask
+    def backward(self, Z, Y=None):
+        masked_Z = Z * self.mask
         if Y is not None:
-            masked_U = torch.cat([masked_U, Y], -1)
-        log_s = self.scale_net(masked_U) * (1 - self.mask)
-        t = self.translate_net(masked_U) * (1 - self.mask)
+            masked_Z = torch.cat([masked_Z, Y], -1)
+            # compute s and t on the masked portion of the output (same as input)
+        log_s = self.scale_net(masked_Z) * (1 - self.mask)
+        t = self.translate_net(masked_Z) * (1 - self.mask)
         s_reciprocal = torch.exp(-log_s)
-        # why is this the inverse...
-        # because s and t are computed on the *masked* [portion]
-        return (U - t) * s_reciprocal
+        return (Z - t) * s_reciprocal
     
 class RealNVP(BaseFlow):
 
     def __init__(
         self,
-        d,
+        d_x,
         n_layers,
-        n_hidden,
-        num_cond_inputs=None,
-        # reverse_batch_norm=False,
-        lr=1e-3,
+        d_model,
+        lr,
+        weight_decay,
+        d_cond=0
     ):
-        mask = torch.arange(0, d) % 2 # alternating bit mask
+        mask = torch.arange(0, d_x) % 2 # alternating bit mask
         flows = torch.nn.ModuleList()
-        # TODO do i need to standardize?
         # if (mu is not None) and (sigma is not None):
         #     flows.append(StandardizationFlow(mu, sigma))
         # if reverse_batch_norm:
@@ -133,10 +125,11 @@ class RealNVP(BaseFlow):
         #     BNF = BatchNormFlow
         for _ in range(n_layers):
             flows.append(
-                CouplingFlow(d, n_hidden, mask, num_cond_inputs)
+                CouplingFlow(d_x, d_model, mask, d_cond)
             )
             # flows.append(BNF(d))
             mask = 1 - mask # flip the bit mask
+        # TODO: fix inheritance issues
         super().__init__()
         
     def forward(self, X, Y=None):
