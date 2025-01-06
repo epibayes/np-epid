@@ -189,10 +189,10 @@ class MoonsDataset(Dataset):
 
     def _make_data(self):
         arr = make_moons(self.n_sample, noise=0.05, random_state=self.random_state)[0]
-        return torch.from_numpy(arr)
+        return torch.from_numpy(arr).float()
 
     def __len__(self):
         return self.n_sample
     
     def __getitem__(self, index):
-        return self.data[index]
+        return self.data[index], torch.empty(0)

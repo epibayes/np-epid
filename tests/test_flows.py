@@ -3,6 +3,7 @@ from hydra.utils import instantiate
 from src.utils import MoonsDataset
 from torch.utils.data import DataLoader
 from hydra import compose, initialize
+from src.model import RealNVP
 
 def test_flows():
     with initialize(config_path="../configs"):

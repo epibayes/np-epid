@@ -1,11 +1,12 @@
 import torch
 import lightning as L
 from torch.nn import ReLU, Tanh, Linear, Sequential
+from torch.distributions import MultivariateNormal
 
 class BaseFlow(L.LightningModule):
-    def __init__(self, lr, weight_decay, dist=None,):
+    def __init__(self, lr=1e-3, weight_decay=0):
         super().__init__()
-        self.dist = dist # distribution of latents
+        self.dist = None # distribution of latents
         self.lr = lr
         self.wd = weight_decay
 
@@ -20,7 +21,7 @@ class BaseFlow(L.LightningModule):
     
 
     def log_prob(self, Z, log_det):
-        prob_Z = self.dist.log_prob(Z).sum(dim=1) # sum across latent dimensions
+        prob_Z = self.dist.log_prob(Z)
         prob_X = prob_Z + log_det
         return prob_X
 
@@ -34,7 +35,7 @@ class BaseFlow(L.LightningModule):
     def training_step(self, batch, batch_idx):
         x, theta = batch
         Z, log_det = self(x, theta)
-        loss = - self.log_prob(Z, log_det)
+        loss = - self.log_prob(Z, log_det).sum()
         self.log("train_loss", loss)
         return loss
 
@@ -111,12 +112,19 @@ class RealNVP(BaseFlow):
         d_x,
         n_layers,
         d_model,
-        lr,
-        weight_decay,
+        lr=1e-3,
+        weight_decay=0,
         d_cond=0
     ):
+        super().__init__(lr, weight_decay)
+        self.register_buffer("loc", torch.zeros(d_x, device=self.device))
+        self.register_buffer("cov", torch.eye(d_x, device=self.device))
+        
+        # self.dist = MultivariateNormal(torch.zeros(d_x), torch.eye(d_x))
         mask = torch.arange(0, d_x) % 2 # alternating bit mask
-        flows = torch.nn.ModuleList()
+        # assign as attribute to register parameters correctly
+        self.flows = torch.nn.ModuleList()
+        # define target, latent distribution
         # if (mu is not None) and (sigma is not None):
         #     flows.append(StandardizationFlow(mu, sigma))
         # if reverse_batch_norm:
@@ -124,160 +132,32 @@ class RealNVP(BaseFlow):
         # else:
         #     BNF = BatchNormFlow
         for _ in range(n_layers):
-            flows.append(
+            self.flows.append(
                 CouplingFlow(d_x, d_model, mask, d_cond)
             )
             # flows.append(BNF(d))
             mask = 1 - mask # flip the bit mask
-        # TODO: fix inheritance issues
-        super().__init__()
+            
+    def on_fit_start(self):
+        # necessary for getting the latent distribution on the same device as the model
+        self.dist = MultivariateNormal(self.loc, self.cov)
+        
         
     def forward(self, X, Y=None):
-        log_det_sum = torch.zeros(X.size(0)) # device=U.device
+        log_det_sum = torch.zeros(X.size(0), device=self.device) # device=U.device
         for module in self.flows:
             Z, log_det = module.forward(X, Y)
             log_det_sum += log_det
             X = Z
         return Z, log_det_sum
 
-    def inverse(self, Z, Y=None):
+    def backward(self, Z, Y=None):
         for module in reversed(self.flows):
             X = module.backward(Z, Y=None)
             Z = X
         return X
-
-# class RealNVP(BaseFlow):
-#     def __init__(self, d, flows: Sequential, dist=None, lr=1e-3):
-#         super().__init__()
-#         self.flows = flows
-
-#     def direct(self, X, cond_inputs=None):
-#         U = X
-#         log_dets = torch.zeros(X.size(0), device=X.device)
-#         for module in self.flows._modules.values():
-#             X = U
-#             U, log_dets_step = module.direct(X, cond_inputs=cond_inputs)
-#             log_dets += log_dets_step
-#         return U, log_dets
-
-#     def inverse(self, U, cond_inputs=None):
-#         X = U
-#         log_dets = torch.zeros(U.size(0), device=U.device)
-#         for module in reversed(self.flows._modules.values()):
-#             U = X
-#             X, log_dets_step = module.inverse(U, cond_inputs=cond_inputs)
-#             log_dets += log_dets_step
-#         return X, log_dets
-
-
     
-# class BatchNormFlow(GenericFlow):
-#     """"""
+    def set_prior(self, d_x):
 
-#     def __init__(self, d, momentum=0.0, eps=1e-5):
-#         super().__init__(d=d)
-
-#         self.log_gamma = Parameter(torch.zeros(d))
-#         self.beta = Parameter(torch.zeros(d))
-#         self.momentum = momentum
-#         self.eps = eps
-
-#         self.register_buffer("running_mean", torch.zeros(d))
-#         self.register_buffer("running_var", torch.ones(d))
-
-#     def direct(self, X, cond_inputs=None):
-#         if self.training:
-#             self.batch_mean = X.mean(0)
-#             self.batch_var = (X - self.batch_mean).pow(2).mean(0) + self.eps
-#             self.running_mean.mul_(self.momentum)
-#             self.running_var.mul_(self.momentum)
-
-#             self.running_mean.add_(self.batch_mean.data * (1 - self.momentum))
-#             self.running_var.add_(self.batch_var.data * (1 - self.momentum))
-#             mean = self.batch_mean
-#             var = self.batch_var
-#         else:
-#             mean = self.running_mean
-#             var = self.running_var
-#         x_hat = (X - mean) / var.sqrt()
-#         y = torch.exp(self.log_gamma) * x_hat + self.beta
-#         return y, (self.log_gamma - 0.5 * torch.log(var)).sum(-1, keepdim=True)
-
-#     def inverse(self, U, cond_inputs=None):
-#         if self.training and hasattr(self, "batch_mean"):
-#             mean = self.batch_mean
-#             var = self.batch_var
-#         else:
-#             mean = self.running_mean
-#             var = self.running_var
-#         x_hat = (U - self.beta) / torch.exp(self.log_gamma)
-#         y = x_hat * var.sqrt() + mean
-#         return y, (-self.log_gamma + 0.5 * torch.log(var)).sum(-1, keepdim=True)
+        return MultivariateNormal(self.loc, self.cov)
     
-    
-
-
-
-# class BatchNormFlowReversed(BatchNormFlow):
-#     def __init__(self, d, momentum=0.0, eps=1e-5):
-#         super().__init__(d=d, momentum=momentum, eps=1e-5)
-
-#     def direct(self, X, cond_inputs=None):
-#         return super().inverse(X, cond_inputs=cond_inputs)
-
-#     def inverse(self, U, cond_inputs=None):
-#         return super().direct(U, cond_inputs=cond_inputs)
-    
-# class StandardizationFlow(GenericFlow):
-#     def __init__(self, mu, sigma):
-#         self.d = mu.size(0)
-#         super().__init__(d=self.d)
-#         self.register_buffer("mu", mu)
-#         self.register_buffer("sigma", sigma)
-
-#     def direct(self, X, cond_inputs=None):
-#         U = (X - self.mu) / self.sigma
-#         log_det = -self.sigma.log().sum()
-#         return U, log_det
-
-#     def inverse(self, U, cond_inputs=None):
-#         X = U * self.sigma + self.mu
-#         log_det = self.sigma.log().sum()
-#         return X, log_det
-
-
-# class RealNVP(SequentialFlow):
-#     """"""
-
-#     def __init__(
-#         self,
-#         d,
-#         n_layers,
-#         n_hidden,
-#         mu=None,
-#         sigma=None,
-#         num_cond_inputs=None,
-#         reverse_batch_norm=False,
-#         lr=1e-3,
-#     ):
-#         mask = torch.arange(0, d) % 2
-#         flows = []
-#         # or do i already handle this in the preprocessing phase
-#         if (mu is not None) and (sigma is not None):
-#             flows.append(StandardizationFlow(mu, sigma))
-#         if reverse_batch_norm:
-#             BNF = BatchNormFlowReversed
-#         else:
-#             BNF = BatchNormFlow
-#         for _ in range(n_layers):
-#             flows.append(
-#                 CouplingFlow(
-#                     d, n_hidden, mask, num_cond_inputs, s_act="tanh", t_act="relu"
-#                 )
-#             )
-#             flows.append(BNF(d))
-#             mask = 1 - mask
-#         super().__init__(d, Sequential(*flows), lr=lr)
-#         self.d = d
-#         self.n_layers = n_layers
-#         self.n_hidden = n_hidden
