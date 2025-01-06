@@ -12,3 +12,4 @@ experiments.md
 *.png
 *.npy
 notebooks/old
+.pytest_cache

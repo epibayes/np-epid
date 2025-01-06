@@ -3,6 +3,8 @@ from hydra.utils import instantiate
 from src.utils import DataModule
 from hydra import compose, initialize
 
+# these tests will not successfully run unless the data storage volume is mounted
+
 def test_homog():
     with initialize(config_path=".."):
         cfg = compose(
@@ -41,7 +43,7 @@ def test_het():
             ],
         )
     data_cfg = cfg[cfg.experiment]
-    dataset = instantiate(data_cfg) # why does this test take so long to run
+    dataset = instantiate(data_cfg)
     observed_data = dataset.get_observed_data()
     batch_size = data_cfg.n_sample
     datamodule = DataModule(

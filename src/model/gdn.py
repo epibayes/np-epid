@@ -1,6 +1,6 @@
 import lightning as L
 import torch
-from torch.nn import Linear, Dropout, ReLU
+from torch.nn import Linear, ReLU
 from torch.distributions.normal import Normal
 from torch.distributions.multivariate_normal import MultivariateNormal
 
@@ -8,7 +8,7 @@ from src.utils import lower_tri, diag
 
 
 class GaussianDensityNetwork(L.LightningModule):
-    def __init__(self, d_x, d_theta, d_model, dropout, lr, weight_decay,
+    def __init__(self, d_x, d_theta, d_model, lr, weight_decay,
                  mean_field):
         super().__init__()
         # compute number of outputs
@@ -20,11 +20,11 @@ class GaussianDensityNetwork(L.LightningModule):
             n_outputs = self.dim + self.dim*(self.dim + 1) // 2
         self.ff = torch.nn.Sequential(
             Linear(d_x, d_model),
-            Dropout(dropout), ReLU(),
+            ReLU(),
             Linear(d_model, d_model),
-            Dropout(dropout), ReLU(),
+            ReLU(),
             Linear(d_model, d_model),
-            Dropout(dropout), ReLU(),
+            ReLU(),
             Linear(d_model, n_outputs),
         )
         # eventually need to save this as an hparam if i am checkpointing models
@@ -90,6 +90,8 @@ class GaussianDensityNetwork(L.LightningModule):
     
 
     def predict_step(self, x):
-        # this returns standard deviation!
+        # this returns standard deviation
         mu, sigma = self(x)
         return mu, sigma
+    
+    # TODO would it make sense to have a "sample" method?

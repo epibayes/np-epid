@@ -2,6 +2,5 @@ name: research
 channels:
   - conda-forge
 dependencies:
-  - pytorch
-  - conda-forge::poetry
-  - lightning
+  - python=3.12
+  - pytorch::pytorch

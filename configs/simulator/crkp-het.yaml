@@ -1,0 +1,7 @@
+defaults:
+  - crkp
+
+heterogeneous: true
+prior_mu: -3
+prior_sigma: 1
+flatten: True

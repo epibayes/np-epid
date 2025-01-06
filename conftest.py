@@ -1,4 +1,7 @@
 # conftest.py
+
+# helpful for debugging tests in VS code
+# also necessary for proper import structure in tests
 import sys
 import pytest
 

@@ -1,0 +1,5 @@
+_target_: src.dataset.BayesLinRegDataset
+n_obs: 10
+shrinkage: 1.
+noise: 1.
+dimension: 1

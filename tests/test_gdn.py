@@ -4,17 +4,6 @@ from src.utils import DataModule
 from hydra import compose, initialize
 
 
-def test_npe_sim_homog():
-    _test("si-model")
-
-def test_npe_sim_heterog():
-    _test("si-model-het")
-    
-def test_npe_sim_partial():
-    _test("si-model-partial")
-
-        
-        
 def _test(simulator):
     with initialize(config_path="../configs"):
         cfg = compose(
@@ -22,9 +11,9 @@ def _test(simulator):
             overrides=[
                 f"simulator={simulator}",
                 "train.max_epochs=10",
-                "simulator.n_sample=250"
+                "simulator.n_sample=100"
             ],
-        )
+    )
     dataset = instantiate(cfg.simulator)
     observed_data = dataset.get_observed_data()
     batch_size = cfg.simulator.n_sample
@@ -40,3 +29,11 @@ def _test(simulator):
     trainer.fit(model, datamodule=datamodule)
 
     model.predict_step(observed_data)
+    
+
+def test_gdn_nn():
+    _test("normal-normal")
+
+def test_gdn_bl():
+    _test("bayes-linreg")
+    

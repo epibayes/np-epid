@@ -1,0 +1,3 @@
+_target_: src.model.GaussianDensityNetwork
+d_model: 32
+mean_field: False

@@ -1,22 +1,17 @@
 import numpy as np
-from src.utils import contact_matrix, simulator, nll, x_loglikelihood
+from src.utils import simulator, nll, x_loglikelihood
 from scipy.optimize import minimize
 from scipy.stats import multivariate_normal
       
-
+# this script won't run unless moved out of src/
+# may need to append sys path
 def main():
-    beta_true = np.array([0.05, .1, .2, .3, .4, .5, 5])
+    beta_true = [.05, .02, .04, .06, .08, .1, .05]
     alpha = 0.1
-    gamma = 0.02
+    gamma = 0.05
     heterogeneous = True
     N = 300 # consider increasing
     T = 52
-    K = 30
-    
-    F = np.arange(N) % 5
-    R = np.arange(N) % (N // 2)
-    fC = contact_matrix(F)
-    rC = contact_matrix(R)
     
     X_o = simulator(alpha, beta_true, gamma, N, T, seed=31, het=heterogeneous)
     
@@ -25,7 +20,7 @@ def main():
         bounds = [(0.0, None) for _ in range(7)], tol=0.001
     )
     
-    prior_mu = np.array([-3, -1.5, -1.5, -1.5, -1.5, -1.5, 1])
+    prior_mu = -3
 
     S = 100
     M = - ml.fun
@@ -47,7 +42,7 @@ def main():
     
     print(attempts)
     
-    np.save("posterior_sample2", sample)
+    np.save("posterior_sample", sample)
 
 if __name__ == "__main__":
     main()
