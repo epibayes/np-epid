@@ -9,13 +9,14 @@ class BaseFlow(L.LightningModule):
         self.dist = None # distribution of latents
         self.lr = lr
         self.wd = weight_decay
+        self.val_losses = []
 
     def forward(self, X, Y=None):
         # X conditional on Y
         raise NotImplementedError()
         return Z, log_det
     
-    def backward(self, Z, Y=None):
+    def inverse(self, Z, Y=None):
         raise NotImplementedError()
         return X
     
@@ -25,26 +26,26 @@ class BaseFlow(L.LightningModule):
         prob_X = prob_Z + log_det
         return prob_X
 
-    def sample(self, sample_shape=torch.Size([1, 1]), cond_inputs=None):
+    def sample(self, sample_size, cond_inputs=None):
         # if self.dist.loc.device != self.device:
         #     self.dist.loc = self.dist.loc.to(self.device)
         #     self.dist.scale = self.dist.scale.to(self.device)
-        Z = self.dist.rsample([sample_shape[0], self.d])
-        return self.inverse(Z, Y=cond_inputs)[0]
+        Z = self.dist.rsample(sample_size)
+        return self.inverse(Z, Y=cond_inputs)
     
     def training_step(self, batch, batch_idx):
         x, theta = batch
         Z, log_det = self(x, theta)
-        loss = - self.log_prob(Z, log_det).sum()
-        self.log("train_loss", loss)
+        loss = - self.log_prob(Z, log_det).mean()
+        self.log("train_loss", loss, prog_bar=True)
         return loss
 
     
     def validation_step(self, batch, batch_idx):
         x, theta = batch
         Z, log_det = self(x, theta)
-        loss = - self.log_prob(Z, log_det)
-        self.log("val_loss", loss)
+        loss = - self.log_prob(Z, log_det).mean()
+        self.log("val_loss", loss, prog_bar=True)
         return loss
     
     def on_validation_epoch_end(self):
@@ -61,7 +62,6 @@ class CouplingFlow(BaseFlow):
         self, d_x, d_model, mask, d_cond=0
     ):
         super().__init__()
-
         self.d_model = d_model
         self.register_buffer("mask", mask.float())
 
@@ -95,7 +95,7 @@ class CouplingFlow(BaseFlow):
         s = torch.exp(log_s)
         return X * s + t, log_s.sum(-1)
 
-    def backward(self, Z, Y=None):
+    def inverse(self, Z, Y=None):
         masked_Z = Z * self.mask
         if Y is not None:
             masked_Z = torch.cat([masked_Z, Y], -1)
@@ -104,6 +104,7 @@ class CouplingFlow(BaseFlow):
         t = self.translate_net(masked_Z) * (1 - self.mask)
         s_reciprocal = torch.exp(-log_s)
         return (Z - t) * s_reciprocal
+    
     
 class RealNVP(BaseFlow):
 
@@ -151,13 +152,13 @@ class RealNVP(BaseFlow):
             X = Z
         return Z, log_det_sum
 
-    def backward(self, Z, Y=None):
+    def inverse(self, Z, Y=None):
         for module in reversed(self.flows):
-            X = module.backward(Z, Y=None)
+            X = module.inverse(Z, Y=None)
             Z = X
         return X
     
-    def set_prior(self, d_x):
+    def set_prior(self):
 
         return MultivariateNormal(self.loc, self.cov)
     

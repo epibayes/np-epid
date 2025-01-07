@@ -9,7 +9,7 @@ from src.utils import DataModule, save_results
 TOY_EXPERIMENTS = ("normal-normal", "bayes-linreg")
 
 @hydra.main(config_path="configs", config_name="config.yaml", version_base=None)
-def main(cfg=None):
+def main(cfg):
     dataset = instantiate(cfg.simulator)
     observed_data = dataset.get_observed_data()
     if cfg.train.batch_size is None:
