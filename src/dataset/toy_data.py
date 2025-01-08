@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from torch.distributions import MultivariateNormal, Normal
-
+import math
 from .simulator import Simulator
 
 COEFFS = torch.tensor([1.45, 1.79, 0.49])
@@ -152,6 +152,27 @@ class BayesLinRegDataset(Simulator):
         xty = (y_o @ X)
         return torch.cat((xtx, xty)).unsqueeze(0).float()
     
+
+
+class ConditionalMoonsDataset(Simulator):
+    # test data set for conditional normalizing flows
+    def __init__(self, n_sample):
+        self.n_sample = n_sample
+        self.d_x = 2
+        self.d_theta = 2
+        self.data, self.theta = self.simulate_data()
+         
+    def simulate_data(self):
+        np.random.seed(8)
+        theta = np.random.uniform(-1, 1, (2, self.n_sample))
+        a = np.random.uniform(low=-math.pi/2, high=math.pi/2, size=self.n_sample)
+        r = np.random.normal(loc=0.1, scale=0.01, size=self.n_sample)
+        p = np.stack([r * np.cos(a) + 0.25, r * np.sin(a)])
+        b0 = (-theta[0] + theta[1]) / math.sqrt(2)
+        b1 = -(np.abs(theta[0] + theta[1])) / math.sqrt(2)
+        x = np.stack([p[0] + b0, p[1] + b1])
+        return torch.tensor(x.T).float(), torch.tensor(theta.T).float()
+    
+    def get_observed_data(self):
+        return torch.tensor([0,0]).unsqueeze(0).float()
         
-
-

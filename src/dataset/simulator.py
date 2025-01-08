@@ -2,13 +2,12 @@ from torch.utils.data import Dataset
 
 
 class Simulator(Dataset):
-    def __init__(self, n_sample, random_state):
+    def __init__(self, n_sample):
         self.n_sample = None
         self.data = None
         self.theta = None
         self.d_x = None
         self.d_theta = None
-        self.random_state = None
 
     def __len__(self):
         return self.n_sample

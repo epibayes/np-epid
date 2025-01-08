@@ -9,7 +9,7 @@ SCALE = [129., 28., 38., 35., 27., 17., 95]
 
 class CRKPTransmissionSimulator(Simulator):
     def __init__(self, path, prior_mu, prior_sigma, n_sample=None,
-                 observed_seed=None, heterogeneous=True,
+                 heterogeneous=True,
                  flatten=False, N=False, pi=None):
         self.n_sample = n_sample
         self.het = heterogeneous

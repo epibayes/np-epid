@@ -16,6 +16,7 @@ class BaseFlow(L.LightningModule):
         raise NotImplementedError()
         return Z, log_det
     
+    #as much as you'd want, you can't call this method "backward"
     def inverse(self, Z, Y=None):
         raise NotImplementedError()
         return X
@@ -113,30 +114,23 @@ class RealNVP(BaseFlow):
         d_x,
         n_layers,
         d_model,
-        lr=1e-3,
-        weight_decay=0,
-        d_cond=0
+        lr,
+        weight_decay,
+        d_theta=0
     ):
         super().__init__(lr, weight_decay)
         self.register_buffer("loc", torch.zeros(d_x, device=self.device))
         self.register_buffer("cov", torch.eye(d_x, device=self.device))
         
-        # self.dist = MultivariateNormal(torch.zeros(d_x), torch.eye(d_x))
         mask = torch.arange(0, d_x) % 2 # alternating bit mask
         # assign as attribute to register parameters correctly
         self.flows = torch.nn.ModuleList()
         # define target, latent distribution
-        # if (mu is not None) and (sigma is not None):
-        #     flows.append(StandardizationFlow(mu, sigma))
-        # if reverse_batch_norm:
-        #     BNF = BatchNormFlowReversed
-        # else:
-        #     BNF = BatchNormFlow
+
         for _ in range(n_layers):
             self.flows.append(
-                CouplingFlow(d_x, d_model, mask, d_cond)
+                CouplingFlow(d_x, d_model, mask, d_theta)
             )
-            # flows.append(BNF(d))
             mask = 1 - mask # flip the bit mask
             
     def on_fit_start(self):

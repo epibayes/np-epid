@@ -19,7 +19,7 @@ def main(cfg):
     datamodule = DataModule(
         dataset, cfg.train.seed, batch_size, cfg.train.train_frac
         )
-    model = instantiate(cfg.model, dataset.d_x, dataset.d_theta)
+    model = instantiate(cfg.model, d_x=dataset.d_x, d_theta=dataset.d_theta)
     if cfg.log:
         wandb.init(reinit=False)
         logger = WandbLogger(project='crkp')
@@ -35,12 +35,14 @@ def main(cfg):
                         log_every_n_steps=cfg.train.log_freq, callbacks=callbacks)
 
     trainer.fit(model, datamodule=datamodule)
-
-    posterior_params = model.predict_step(observed_data)
-    if cfg.experiment in TOY_EXPERIMENTS:
-        dataset.evaluate(posterior_params)
-    else:
-        save_results(posterior_params, model.val_losses, cfg)
+    if cfg.model == "gdn":
+        posterior_params = model.predict_step(observed_data)
+        if cfg.simulator in TOY_EXPERIMENTS:
+            dataset.evaluate(posterior_params)
+        else:
+            save_results(posterior_params, model.val_losses, cfg)
+    if cfg.model == "flow":
+        pass # need to figure out the proper way to handle a trained flow model
     wandb.finish()
 
 
