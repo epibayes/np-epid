@@ -5,7 +5,6 @@ defaults:
 
 simulator:
   n_sample: 4000
-  observed_seed: 5
 
 train:
   train_frac: 0.75
@@ -21,7 +20,7 @@ model:
   lr: 0.001
   weight_decay: 0.0
 
-log: False
+log: True
 
 
 hydra:
