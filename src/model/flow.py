@@ -28,15 +28,16 @@ class BaseFlow(L.LightningModule):
         return prob_X
 
     def sample(self, sample_size, cond_inputs=None):
-        # if self.dist.loc.device != self.device:
-        #     self.dist.loc = self.dist.loc.to(self.device)
-        #     self.dist.scale = self.dist.scale.to(self.device)
-        Z = self.dist.rsample(sample_size)
+        if self.device != cond_inputs.device:
+            cond_inputs = cond_inputs.to(self.device)
+        if cond_inputs.shape[0] == 1:
+            cond_inputs = cond_inputs.repeat(sample_size, 1)
+        Z = self.dist.rsample((sample_size,))
         return self.inverse(Z, Y=cond_inputs)
     
     def training_step(self, batch, batch_idx):
         x, theta = batch
-        Z, log_det = self(x, theta)
+        Z, log_det = self(theta, x)
         loss = - self.log_prob(Z, log_det).mean()
         self.log("train_loss", loss, prog_bar=True)
         return loss
@@ -44,7 +45,7 @@ class BaseFlow(L.LightningModule):
     
     def validation_step(self, batch, batch_idx):
         x, theta = batch
-        Z, log_det = self(x, theta)
+        Z, log_det = self(theta, x)
         loss = - self.log_prob(Z, log_det).mean()
         self.log("val_loss", loss, prog_bar=True)
         return loss
@@ -148,7 +149,7 @@ class RealNVP(BaseFlow):
 
     def inverse(self, Z, Y=None):
         for module in reversed(self.flows):
-            X = module.inverse(Z, Y=None)
+            X = module.inverse(Z, Y)
             Z = X
         return X
     

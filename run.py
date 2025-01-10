@@ -5,11 +5,13 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from hydra.utils import instantiate
 from src.utils import DataModule, save_results
+from torch import device, no_grad
 
 TOY_EXPERIMENTS = ("normal-normal", "bayes-linreg")
 
 @hydra.main(config_path="configs", config_name="config.yaml", version_base=None)
 def main(cfg):
+    gpu = device(cfg.gpu_device)
     dataset = instantiate(cfg.simulator)
     observed_data = dataset.get_observed_data()
     if cfg.train.batch_size is None:
@@ -42,7 +44,11 @@ def main(cfg):
         else:
             save_results(posterior_params, model.val_losses, cfg)
     if cfg.model == "flow":
-        pass # need to figure out the proper way to handle a trained flow model
+        with no_grad():
+            M = cfg.n_posterior_sample
+            cfg.model.to(gpu).sample(
+                (M,), dataset.get_observed_data(M).to(gpu)
+            )
     wandb.finish()
 
 

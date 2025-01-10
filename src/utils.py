@@ -24,12 +24,13 @@ class DataModule(L.LightningDataModule):
                 (train_size, val_size),
                 torch.Generator().manual_seed(self.seed)
         )
+        self.val_size = val_size
 
     def train_dataloader(self):
         return DataLoader(self.train, self.batch_size, shuffle=True)
     
     def val_dataloader(self):
-        return DataLoader(self.val, self.batch_size)
+        return DataLoader(self.val, self.val_size)
     
 def lower_tri(values, dim):
     if values.shape[0] > 1:
@@ -195,4 +196,4 @@ class MoonsDataset(Dataset):
         return self.n_sample
     
     def __getitem__(self, index):
-        return self.data[index], torch.empty(0)
+        return torch.empty(0), self.data[index]

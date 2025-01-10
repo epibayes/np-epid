@@ -22,6 +22,9 @@ model:
 
 log: True
 
+n_posterior_sample: 100
+
+gpu_device: "mps"
 
 hydra:
   job:

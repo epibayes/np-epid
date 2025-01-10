@@ -168,8 +168,8 @@ class ConditionalMoonsDataset(Simulator):
         a = np.random.uniform(low=-math.pi/2, high=math.pi/2, size=self.n_sample)
         r = np.random.normal(loc=0.1, scale=0.01, size=self.n_sample)
         p = np.stack([r * np.cos(a) + 0.25, r * np.sin(a)])
-        b0 = (-theta[0] + theta[1]) / math.sqrt(2)
-        b1 = -(np.abs(theta[0] + theta[1])) / math.sqrt(2)
+        b0 = - np.abs(theta[0] + theta[1]) / math.sqrt(2)
+        b1 = (-theta[0] + theta[1]) / math.sqrt(2)
         x = np.stack([p[0] + b0, p[1] + b1])
         return torch.tensor(x.T).float(), torch.tensor(theta.T).float()
     
