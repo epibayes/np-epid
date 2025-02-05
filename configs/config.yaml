@@ -21,6 +21,7 @@ model:
   weight_decay: 0.0
 
 log: True
+fast_dev_run: False
 
 n_posterior_sample: 100
 

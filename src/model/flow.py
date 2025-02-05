@@ -120,18 +120,18 @@ class RealNVP(BaseFlow):
         d_theta=0
     ):
         super().__init__(lr, weight_decay)
-        self.register_buffer("loc", torch.zeros(d_x, device=self.device))
-        self.register_buffer("cov", torch.eye(d_x, device=self.device))
+        self.register_buffer("loc", torch.zeros(d_theta, device=self.device))
+        self.register_buffer("cov", torch.eye(d_theta, device=self.device))
         
-        mask = torch.arange(0, d_x) % 2 # alternating bit mask
+        mask = torch.arange(0, d_theta) % 2 # alternating bit mask
         # assign as attribute to register parameters correctly
         self.flows = torch.nn.ModuleList()
         # define target, latent distribution
 
         for _ in range(n_layers):
             self.flows.append(
-                CouplingFlow(d_x, d_model, mask, d_theta)
-            )
+                CouplingFlow(d_theta, d_model, mask, d_x)
+            ) # this gets confusing because we're *conditioning* on X
             mask = 1 - mask # flip the bit mask
             
     def on_fit_start(self):
