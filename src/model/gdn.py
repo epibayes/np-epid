@@ -11,6 +11,7 @@ class GaussianDensityNetwork(L.LightningModule):
     def __init__(self, d_x, d_theta, d_model, lr, weight_decay,
                  mean_field):
         super().__init__()
+        self.name = "gdn"
         # compute number of outputs
         self.dim = d_theta
         # assume diagonal covariance matrix

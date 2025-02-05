@@ -38,18 +38,19 @@ def main(cfg):
                         fast_dev_run=cfg.fast_dev_run)
 
     trainer.fit(model, datamodule=datamodule)
-    if cfg.model == "gdn":
+    if model.name == "gdn":
         posterior_params = model.predict_step(observed_data)
         if cfg.simulator in TOY_EXPERIMENTS:
             dataset.evaluate(posterior_params)
         else:
             save_results(posterior_params, model.val_losses, cfg)
-    if cfg.model == "flow":
+    elif model.name == "flow":
         with no_grad():
             M = cfg.n_posterior_sample
-            cfg.model.to(gpu).sample(
-                (M,), dataset.get_observed_data(M).to(gpu)
+            sample = model.to(gpu).sample(
+                M, dataset.get_observed_data(M).to(gpu)
             )
+            print(sample.mean(0))
     wandb.finish()
 
 

@@ -120,6 +120,7 @@ class RealNVP(BaseFlow):
         d_theta=0
     ):
         super().__init__(lr, weight_decay)
+        self.name = "flow"
         self.register_buffer("loc", torch.zeros(d_theta, device=self.device))
         self.register_buffer("cov", torch.eye(d_theta, device=self.device))
         
