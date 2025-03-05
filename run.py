@@ -5,7 +5,7 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from hydra.utils import instantiate
 from src.utils import DataModule, save_results
-from torch import device, no_grad
+from torch import device, no_grad, exp
 
 TOY_EXPERIMENTS = ("normal-normal", "bayes-linreg")
 
@@ -50,6 +50,8 @@ def main(cfg):
             sample = model.to(gpu).sample(
                 M, dataset.get_observed_data(M).to(gpu)
             )
+            if cfg.simulator.log_scale:
+                sample = exp(sample)
             print(sample.mean(0))
     wandb.finish()
 
