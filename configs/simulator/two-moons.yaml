@@ -1,1 +1,2 @@
 _target_: src.dataset.ConditionalMoonsDataset
+name: two-moons

@@ -5,11 +5,11 @@ from .simulator import Simulator
 from ..utils import contact_matrix
 from torch.distributions import MultivariateNormal
 
-SCALE = [129., 28., 38., 35., 27., 17., 95]
+SCALE = [129., 28., 38., 35., 27., 17., 2]
 
 class CRKPTransmissionSimulator(Simulator):
     def __init__(self, path, prior_mu, prior_sigma, n_sample=None,
-                 heterogeneous=True,
+                 heterogeneous=True, name=None,
                  flatten=False, N=False, pi=None):
         self.n_sample = n_sample
         self.het = heterogeneous
@@ -37,6 +37,7 @@ class CRKPTransmissionSimulator(Simulator):
             self.data, self.theta = self.simulate_data()
 
         self.x_o = self.load_observed_data(path)
+        self.name = name
         
 
     def set_prior(self, mu, sigma):
@@ -89,7 +90,6 @@ class CRKPTransmissionSimulator(Simulator):
         X = np.empty((N, T))
         # load screen data for first day
         X[:, 0] = self.V[:, 0]
-        # TODO: fix room statistic
         room_count = np.empty(T)
         for t in range(1, T):
             x = X[:, t-1]

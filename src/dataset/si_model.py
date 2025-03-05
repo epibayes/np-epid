@@ -7,7 +7,7 @@ from ..utils import contact_matrix
 
 class SIModel(Simulator):
     def __init__(self, alpha, gamma, beta_true, heterogeneous,
-                 prior_mu, prior_sigma,  N, T, summarize=False,
+                 prior_mu, prior_sigma,  N, T, name=None, summarize=False,
                  observed_seed=None, room=False, log_scale=True,
                  n_sample=None, flatten=True, pi=None, eta = None):
         self.log_scale = log_scale
@@ -47,6 +47,7 @@ class SIModel(Simulator):
         if n_sample is not None:
             self.data, self.theta = self.simulate_data()
         self.obs = observed_seed
+        self.name = name
 
     def set_prior(self, mu, sigma):
         if self.d_theta == 1:

@@ -5,3 +5,4 @@ prior_sigma: 1
 heterogeneous: False
 N: -1
 pi:
+name: "crkp"

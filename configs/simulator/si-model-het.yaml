@@ -9,3 +9,4 @@ observed_seed: 31
 N: 300
 gamma: 0.05
 log_scale: False
+name: si-model-het

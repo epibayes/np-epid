@@ -40,11 +40,13 @@ def main(cfg):
     trainer.fit(model, datamodule=datamodule)
     if model.name == "gdn":
         posterior_params = model.predict_step(observed_data)
-        if cfg.simulator in TOY_EXPERIMENTS:
+        if cfg.simulator.name in TOY_EXPERIMENTS:
             dataset.evaluate(posterior_params)
         else:
             save_results(posterior_params, model.val_losses, cfg)
     elif model.name == "flow":
+        # TODO: figure out logic for saving results from normalizing flows
+        # this is starting to get ugly!
         with no_grad():
             M = cfg.n_posterior_sample
             sample = model.to(gpu).sample(

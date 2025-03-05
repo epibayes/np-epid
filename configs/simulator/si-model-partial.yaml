@@ -3,3 +3,4 @@ defaults:
   
 eta: 0.1
 log_scale: False
+name: si-model-partial

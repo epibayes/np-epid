@@ -1,0 +1,5 @@
+_target_: src.dataset.phylo_sim.PhyloSimulator
+beta_true: [.05, .02, .04, .06, .08, .1, .05]
+prior_mu: -3
+prior_sigma: 1
+observed_seed: 31

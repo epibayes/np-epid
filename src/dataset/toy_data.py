@@ -8,7 +8,7 @@ COEFFS = torch.tensor([1.45, 1.79, 0.49])
 
 
 class NormalNormalDataset(Simulator):
-    def __init__(self, n_obs, n_sample, observed_seed, shrinkage, noise, dimension):
+    def __init__(self, n_obs, n_sample, observed_seed, shrinkage, noise, dimension, name):
         if dimension > 3:
             raise ValueError("Test case designed for dimensions < 4")
         self.n_sample = n_sample
@@ -21,6 +21,7 @@ class NormalNormalDataset(Simulator):
         self.theta_true = COEFFS[:dimension]
 
         self.data, self.theta = self.simulate_data()
+        self.name = name
 
     
 
@@ -84,7 +85,7 @@ class NormalNormalDataset(Simulator):
 
 
 class BayesLinRegDataset(Simulator):
-    def __init__(self, n_obs, n_sample, observed_seed, shrinkage, noise, dimension):
+    def __init__(self, n_obs, n_sample, observed_seed, shrinkage, noise, dimension, name):
         if dimension > 3:
             raise ValueError("Test case designed for dimensions < 4")
         self.n_sample = n_sample
@@ -97,6 +98,7 @@ class BayesLinRegDataset(Simulator):
         self.theta_true = COEFFS[:dimension]
 
         self.data, self.theta = self.simulate_data()
+        self.name = name
 
     def simulate_data(self):
         # might be nice not to hard code this
@@ -156,11 +158,12 @@ class BayesLinRegDataset(Simulator):
 
 class ConditionalMoonsDataset(Simulator):
     # test data set for conditional normalizing flows
-    def __init__(self, n_sample):
+    def __init__(self, n_sample, name):
         self.n_sample = n_sample
         self.d_x = 2
         self.d_theta = 2
         self.data, self.theta = self.simulate_data()
+        self.name = name
          
     def simulate_data(self):
         np.random.seed(8)

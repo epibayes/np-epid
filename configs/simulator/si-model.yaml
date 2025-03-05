@@ -12,3 +12,4 @@ observed_seed: 29
 heterogeneous: False
 pi:
 eta:
+name: si-model
