@@ -56,6 +56,13 @@ def contact_matrix(arr):
     x, y = np.meshgrid(arr, arr)
     return (x == y).astype(int)
 
+
+def categorical_sample(p):
+    s = p.cumsum(axis=0)
+    r = np.random.rand(p.shape[1])
+    k = (s < r).sum(axis=0)
+    return k
+
 def save_results(posterior_params, val_losses, cfg):
     if cfg.simulator.name in ["si-model", "crkp"]:
         mu = posterior_params[0].item()
@@ -107,7 +114,10 @@ def get_results(path, drop=True, multirun=True):
                 else:
                     data[k].append(v)
     data = pd.DataFrame(data)
-    data.drop(columns=["_target_", "lr", "batch_size", "dropout", "seed"])
+    try:
+        data.drop(columns=["_target_", "lr", "batch_size", "dropout", "seed"])
+    except KeyError: # in later iterations, i'm not saving dropout or seed...this is hacky
+        data.drop(columns=["_target_", "lr", "batch_size"])
     return data
         
 # LIKELIHOOD BASED ESTIMATION

@@ -51,7 +51,6 @@ class CRKPTransmissionSimulator(Simulator):
             self.prior_sigma = sigma
 
     def load_observed_data(self, path):
-        # todo: add logic for switching between homogeneous/hetero
         with open(f"{path}/observed_data.npy", "rb") as f:
             x = np.load(f)
         # scale    
