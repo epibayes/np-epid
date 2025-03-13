@@ -142,7 +142,7 @@ class CRKPTransmissionSimulator(Simulator):
             # does this work with matrix indexing?
             floor_count = np.nansum(X * (self.F == i), axis=0)
             floor_counts.append(floor_count)
-            stats = [total_count] + floor_counts + [room_count]
+        stats = [total_count] + floor_counts + [room_count]
         data = torch.tensor(np.stack(stats)).float() / self.L
         
         if not (self.het or show_full_data):

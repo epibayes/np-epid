@@ -29,6 +29,8 @@ class PhyloSimulator(Simulator):
         self.prior_sigma = torch.diag(torch.full((7,), prior_sigma)).float()
         self.obs = observed_seed
         self.d_theta = 7
+        self.N_f = 5 # number of floors
+        self.N_r = 50 # number of rooms
         self.name = "phylo-sim"
         
     
@@ -73,8 +75,11 @@ class PhyloSimulator(Simulator):
         # negative admits are assigned no cluster
         K[:, 0] = np.where(self.V[:, 0] == 0, 0, K[:,0])
    
-        capacity = np.array([M] + [M/5]*5 + [M/50])
+        capacity = np.array([M] + [M/self.N_f]*self.N_f + [M/self.N_r])
         room_count = np.empty(T)
+        
+        room_cluster = np.zeros((N_k, T))
+        
         for t in range(1, T):
             x = X[:, t-1]
             k = K[:, t-1]
@@ -90,8 +95,6 @@ class PhyloSimulator(Simulator):
             X[:, t] = np.where(newly_admitted, self.V[:, t], X[:, t])
             # if there is a newly screened case, add a new cluster
             # otherwise, assign "no cluster" to a negative admission
-            # K[:, t] = np.where(self.V[:, t] == 1, self.L, K[:, t])
-            # K[:, t] = np.where(self.V[:, t] == 0, 0, K[:, t])
             K[:, t] = np.where(newly_admitted, self.L, K[:, t])
             # case 3: already admitted and susceptible
             # randomly model transmission event
@@ -109,13 +112,12 @@ class PhyloSimulator(Simulator):
             ra = r[w > 0].astype(int)
             rC = contact_matrix(ra)
             infected_roommates = (rC * Ia)
-            room_count[t-1] = (infected_roommates > 1).sum()
+            room_count[t-1] = (infected_roommates.sum(1) > 1).sum()
             hazard += infected_roommates * beta[-1] / capacity[-1]
             # new approach: keep hazard as an NxN matrix
             p = np.zeros(N)
             p[self.W[:, t] > 0] = 1 - np.exp(-hazard.sum(1))
             # this may be the wrong approach..
-            # p = 0.2 
             X[:, t] = np.where(staying * (x == 0), np.random.binomial(1, p, N), X[:, t])
             
             # compute cluster assignment probabilities
@@ -137,4 +139,68 @@ class PhyloSimulator(Simulator):
             kb[self.W[:, t] > 0] = cluster_assignments + 1 
             K[:, t] = np.where((X[:, t] == 1) * (x == 0), kb, K[:, t])
             
+            # todo: compute cluster overlap in rooms
+            roommate_clusters = rC * ka
+            for rk in roommate_clusters:
+                nonzero_ix = np.nonzero(rk)
+                unique, counts = np.unique(rk[nonzero_ix], return_counts=True)
+                for u, c in zip(unique, counts):
+                    if c > 1:
+                        room_cluster[u-1, t] = c
             
+            
+        # compute last infected room count
+        # r = self.R[:, T-1]
+        w = self.W[:, T-1]
+        ra = self.R[:, T-1][w > 0]
+        rC = contact_matrix(ra)
+        Ia = X[:, T-1][w > 0]
+        infected_roommates = (rC * Ia).sum(1)
+        room_count[T-1] = (infected_roommates > 1).sum()
+        # compute last room cluster overlap
+        ka = K[:, T-1][w > 0].astype(int)
+        roommate_clusters = rC * ka
+        for rk in roommate_clusters:
+            nonzero_ix = np.nonzero(rk)
+            unique, counts = np.unique(rk[nonzero_ix], return_counts=True)
+            for u, c in zip(unique, counts):
+                if c > 1:
+                    room_cluster[u-1, T-1] = c
+        
+        
+        # start writing out data
+        total_count = np.nansum(X, axis=0)
+        # demographic data
+        demog  = [total_count]
+        for i in range(self.N_f):
+            # does this work with matrix indexing?
+            floor_count = np.nansum(X * (self.F == i), axis=0)
+            demog.append(floor_count)
+        demog.append(room_count)
+        demog = np.stack(demog)
+        # genomic data
+        cluster_counts = np.zeros((N_k, T))
+        cluster_floor_counts = np.zeros((N_k, self.N_f, T))
+        # how to even process room data
+        for t in range(T):
+            for n in range(N):
+                k = K[n, t]
+                f = self.F[n, t]
+                if k and not np.isnan(k):
+                    cluster_counts[int(k)-1, t] += 1
+                    cluster_floor_counts[int(k)-1, int(f), t] += 1
+                    
+        genom = np.concatenate([
+            cluster_counts, 
+            cluster_floor_counts.reshape(-1, T),
+            room_cluster
+            ])
+        
+        
+        return np.concatenate([demog, genom])
+        
+        
+                    
+        
+                        
+        
