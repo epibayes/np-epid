@@ -9,8 +9,8 @@ import os
 
 
 class PhyloSimulator(Simulator):
-    def __init__(self, beta_true, prior_mu, prior_sigma, observed_seed, n_sample,
-                 notebook_mode=False):
+    def __init__(self, beta_true, prior_mu, prior_sigma, observed_seed, 
+                 time_first, n_sample=None, notebook_mode=False):
         self.n_sample = n_sample
         prefix = ".." if notebook_mode else get_original_cwd()
         self.W = pd.read_csv(f"{prefix}/sim_data/facility_trace.csv").values
@@ -32,30 +32,37 @@ class PhyloSimulator(Simulator):
         self.N_f = 5 # number of floors
         self.N_r = 50 # number of rooms
         self.name = "phylo-sim"
+        self.time_first = time_first
+        if n_sample is not None:
+            self.data, self.theta = self.simulate_data()
+        
+        self.d_x  = self.data[0].shape # here goes nothing
         
     
     def simulate_data(self):
         thetas = self.sample_logbeta(self.n_sample).float()
-        
+        xs = []
         for i in range(self.n_sample):
             seed = 3*i
-            self.simulate(
+            xs.append(
+                self.simulate(
                 np.array(thetas[i]), seed
+                )
             )
-        
-        return None, thetas
+        xs = torch.stack(xs)
+        return xs.float(), thetas
     
     def sample_logbeta(self, N):
-        generator = torch.Generator()
-        generator.manual_seed(4)
+        torch.manual_seed(4)
         mvn = MultivariateNormal(self.prior_mu, self.prior_sigma)
-        return mvn.sample((N,), generator=generator)
+        return mvn.sample((N,))
     
     def get_observed_data(self):
         theta_true = np.log(np.array(self.beta_true))
         # TODO: log scale switching
         x_o = self.simulate(theta_true, self.obs)
-        return x_o.float()
+        return x_o
+        # return x_o.float()
         
     
     def simulate(self, theta, seed):
@@ -139,18 +146,16 @@ class PhyloSimulator(Simulator):
             kb[self.W[:, t] > 0] = cluster_assignments + 1 
             K[:, t] = np.where((X[:, t] == 1) * (x == 0), kb, K[:, t])
             
-            # todo: compute cluster overlap in rooms
+            # cluster overlap by room
             roommate_clusters = rC * ka
             for rk in roommate_clusters:
                 nonzero_ix = np.nonzero(rk)
                 unique, counts = np.unique(rk[nonzero_ix], return_counts=True)
                 for u, c in zip(unique, counts):
-                    if c > 1:
+                    if c > 1: # multiple patients of the same cluster type
                         room_cluster[u-1, t] = c
             
             
-        # compute last infected room count
-        # r = self.R[:, T-1]
         w = self.W[:, T-1]
         ra = self.R[:, T-1][w > 0]
         rC = contact_matrix(ra)
@@ -181,7 +186,6 @@ class PhyloSimulator(Simulator):
         # genomic data
         cluster_counts = np.zeros((N_k, T))
         cluster_floor_counts = np.zeros((N_k, self.N_f, T))
-        # how to even process room data
         for t in range(T):
             for n in range(N):
                 k = K[n, t]
@@ -195,9 +199,11 @@ class PhyloSimulator(Simulator):
             cluster_floor_counts.reshape(-1, T),
             room_cluster
             ])
-        
-        
-        return np.concatenate([demog, genom])
+    
+        output = np.concatenate([demog, genom])
+        if self.time_first:
+            output = output.T
+        return torch.from_numpy(output)
         
         
                     

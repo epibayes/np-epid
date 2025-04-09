@@ -1,0 +1,7 @@
+_target_: src.model.GaussianDensityTransformer
+d_model: 32
+mean_field: False
+embed_dim: 8
+n_heads: 4
+dropout: 0
+n_blocks: 1

@@ -46,7 +46,6 @@ def main(cfg):
             save_results(posterior_params, model.val_losses, cfg)
     elif model.name == "flow":
         # TODO: figure out logic for saving results from normalizing flows
-        # this is starting to get ugly!
         with no_grad():
             M = cfg.n_posterior_sample
             sample = model.to(gpu).sample(

@@ -5,11 +5,13 @@ from torch.distributions.normal import Normal
 from torch.distributions.multivariate_normal import MultivariateNormal
 
 from src.utils import lower_tri, diag
+import math
+
 
 
 class GaussianDensityNetwork(L.LightningModule):
     def __init__(self, d_x, d_theta, d_model, lr, weight_decay,
-                 mean_field):
+                 mean_field, embed_dim):
         super().__init__()
         self.name = "gdn"
         # compute number of outputs
@@ -19,6 +21,14 @@ class GaussianDensityNetwork(L.LightningModule):
             n_outputs = self.dim * 2
         else:
             n_outputs = self.dim + self.dim*(self.dim + 1) // 2
+        self.embed_dim = embed_dim
+        if type(d_x) == tuple:
+            assert self.embed_dim
+        if self.embed_dim:
+            self.embed = torch.nn.Linear(d_x[1], embed_dim)
+            d_x = embed_dim * d_x[0]
+            # does this actually do anything...
+            # at best, preserves the time dimension first
         self.ff = torch.nn.Sequential(
             Linear(d_x, d_model),
             ReLU(),
@@ -33,10 +43,15 @@ class GaussianDensityNetwork(L.LightningModule):
         self.wd = weight_decay
         self.mean_field = mean_field
         self.val_losses = []
+        
+    def encoder(self, x):
+        if self.embed_dim:
+            x = self.embed(x)
+            x = x.flatten(1, -1)
+        return self.ff(x)
 
     def forward(self, x):
-        assert len(x.shape) == 2
-        y = self.ff(x)
+        y = self.encoder(x)
         mu = y[:, :self.dim]
         sigma = y[:, self.dim:]
         # case one: unidimensional or mean field
@@ -95,4 +110,53 @@ class GaussianDensityNetwork(L.LightningModule):
         mu, sigma = self(x)
         return mu, sigma
     
-    # TODO would it make sense to have a "sample" method?
+    # does it make sense to have a "sample" method?
+    
+    
+class GaussianDensityTransformer(GaussianDensityNetwork):
+    def __init__(self, d_x, d_theta, d_model, lr, weight_decay,
+                mean_field, n_heads, dropout, n_blocks):
+        super().__init__(d_x, d_theta, d_model, lr, weight_decay,
+                mean_field, embed_dim=0)
+        self.name = "transformer"
+        
+        
+        self.pos_encode = PositionalEncoding(d_model)
+        encoder_layer = torch.nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=n_heads,
+            dropout=dropout,
+            batch_first=True,
+            dim_feedforward=d_model*4
+        )
+        norm = torch.nn.LayerNorm(d_model)
+        self.embed = Linear(d_x, d_model)
+        self.transformer = torch.nn.TransformerEncoder(encoder_layer, n_blocks, norm)
+        self.to_output()
+        
+    def encoder(self, x):
+        x = self.embed(x)
+        x = self.pos_encode(x)
+        y = self.transformer(x)
+        # pooling operation
+        # averaging makes the most intuitive sense imo
+        y = y.mean(dim=1)
+        
+        
+        
+class PositionalEncoding(torch.nn.Module):
+
+    def __init__(self, d_model, dropout=0.0, max_len=1000):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = torch.nn.Dropout(p=dropout)
+
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.pe[:x.size(1), :].unsqueeze(0)
+        return self.dropout(x)
