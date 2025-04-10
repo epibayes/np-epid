@@ -1,3 +1,4 @@
 _target_: src.model.RealNVP
 d_model: 128
 n_layers: 4
+embed_dim: 0

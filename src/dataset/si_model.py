@@ -72,6 +72,7 @@ class SIModel(Simulator):
         return xs, thetas.float()
     
     def get_observed_data(self, observed_seed=None):
+        # why did I include observed_seed as an argument?
         if observed_seed is None:
             observed_seed = self.obs
         theta_true = np.array(self.beta_true)

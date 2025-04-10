@@ -10,7 +10,7 @@ import os
 
 class PhyloSimulator(Simulator):
     def __init__(self, beta_true, prior_mu, prior_sigma, observed_seed, 
-                 time_first, n_sample=None, notebook_mode=False):
+                 time_first, n_sample=None, notebook_mode=False, log_scale=True):
         self.n_sample = n_sample
         prefix = ".." if notebook_mode else get_original_cwd()
         self.W = pd.read_csv(f"{prefix}/sim_data/facility_trace.csv").values
@@ -22,21 +22,21 @@ class PhyloSimulator(Simulator):
         for i, k in enumerate(self.cluster_indices):
             self.L[k] = i+1
         # self.n_clusters = len(self.clusters)
-        
         self.beta_true = beta_true
-        
         self.prior_mu = torch.full((7,), prior_mu).float()
         self.prior_sigma = torch.diag(torch.full((7,), prior_sigma)).float()
         self.obs = observed_seed
+        self.log_scale = log_scale
         self.d_theta = 7
         self.N_f = 5 # number of floors
         self.N_r = 50 # number of rooms
         self.name = "phylo-sim"
         self.time_first = time_first
+        self.d_x = None
+        self.n_sample = n_sample
         if n_sample is not None:
             self.data, self.theta = self.simulate_data()
-        
-        self.d_x  = self.data[0].shape # here goes nothing
+            self.d_x  = self.data[0].shape # here goes nothing
         
     
     def simulate_data(self):
@@ -58,18 +58,20 @@ class PhyloSimulator(Simulator):
         return mvn.sample((N,))
     
     def get_observed_data(self):
-        theta_true = np.log(np.array(self.beta_true))
-        # TODO: log scale switching
+        theta_true = np.array(self.beta_true)
+        if self.log_scale:
+            theta_true = np.log(theta_true)
         x_o = self.simulate(theta_true, self.obs)
-        return x_o
-        # return x_o.float()
+        if self.n_sample is not None:
+            x_o = x_o.unsqueeze(0)
+        return x_o.float()
         
     
     def simulate(self, theta, seed):
         beta = np.exp(theta)
         
         np.random.seed(seed)
-        M = 100 # don't hardcode this
+        M = 100
         N, T = self.W.shape
         N_k = int(self.L.max())
         # infection statuses

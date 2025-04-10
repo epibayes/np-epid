@@ -63,14 +63,13 @@ def categorical_sample(p):
     k = (s < r).sum(axis=0)
     return k
 
-def save_results(posterior_params, val_losses, cfg):
-    if cfg.simulator.name in ["si-model", "crkp"]:
+def save_results(posterior_params, val_losses, cfg, name):
+    # special case for homogeneous models
+    if name in ["si-model", "crkp"]:
         mu = posterior_params[0].item()
         sigma = posterior_params[1].item()
         print(np.round(mu, 3))
         print(np.round(sigma, 3))
-        prior_mu = cfg.simulator["prior_mu"]
-        prior_sigma = cfg.simulator["prior_sigma"]
     else:
         mu = posterior_params[0].tolist()
         L = posterior_params[1]
@@ -78,16 +77,10 @@ def save_results(posterior_params, val_losses, cfg):
         sdiag = (L @ L.T).diag().tolist()
         print(np.round(mu, 3))
         print(np.round(sdiag, 3)) # marginal variances
-        prior_mu = cfg.simulator["prior_mu"]
-        prior_sigma = cfg.simulator["prior_sigma"]
     results = {"mu": mu, "sigma":sigma,
-               "val_loss": val_losses[-1],
-               "n_sample": cfg.simulator["n_sample"],
-               "batch_size": cfg.train["batch_size"],
-               "N": cfg.simulator["N"],
-               "prior_mu": prior_mu,
-               "prior_sigma": prior_sigma,
-               "name": cfg.simulator["name"]}
+               "val_loss": val_losses[-1]}
+    for key in cfg["simulator"]:
+        results[key] = cfg["simulator"][key]
     for key in cfg["model"]:
         results[key] = cfg["model"][key]
     # should probably save seed, etc.
@@ -96,7 +89,7 @@ def save_results(posterior_params, val_losses, cfg):
         
 # reading multiruns
 
-def get_results(path, drop=True, multirun=True):
+def get_results(path, multirun=True):
     extension =  "/results.yaml"
     if multirun: extension = "/**" + extension
     # if multirun:

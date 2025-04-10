@@ -9,35 +9,18 @@ import math
 
 
 
-class GaussianDensityNetwork(L.LightningModule):
-    def __init__(self, d_x, d_theta, d_model, lr, weight_decay,
-                 mean_field, embed_dim):
+class GaussianDensityNetworkBase(L.LightningModule):
+    def __init__(self, d_theta, lr, weight_decay,
+                 mean_field):
         super().__init__()
-        self.name = "gdn"
+        self.estimator = "gdn"
         # compute number of outputs
         self.dim = d_theta
         # assume diagonal covariance matrix
         if mean_field:
-            n_outputs = self.dim * 2
+            self.n_outputs = self.dim * 2
         else:
-            n_outputs = self.dim + self.dim*(self.dim + 1) // 2
-        self.embed_dim = embed_dim
-        if type(d_x) == tuple:
-            assert self.embed_dim
-        if self.embed_dim:
-            self.embed = torch.nn.Linear(d_x[1], embed_dim)
-            d_x = embed_dim * d_x[0]
-            # does this actually do anything...
-            # at best, preserves the time dimension first
-        self.ff = torch.nn.Sequential(
-            Linear(d_x, d_model),
-            ReLU(),
-            Linear(d_model, d_model),
-            ReLU(),
-            Linear(d_model, d_model),
-            ReLU(),
-            Linear(d_model, n_outputs),
-        )
+            self.n_outputs = self.dim + self.dim*(self.dim + 1) // 2
         # eventually need to save this as an hparam if i am checkpointing models
         self.lr = lr
         self.wd = weight_decay
@@ -45,10 +28,7 @@ class GaussianDensityNetwork(L.LightningModule):
         self.val_losses = []
         
     def encoder(self, x):
-        if self.embed_dim:
-            x = self.embed(x)
-            x = x.flatten(1, -1)
-        return self.ff(x)
+        raise NotImplementedError
 
     def forward(self, x):
         y = self.encoder(x)
@@ -109,17 +89,49 @@ class GaussianDensityNetwork(L.LightningModule):
         # this returns standard deviation
         mu, sigma = self(x)
         return mu, sigma
+
+
+class GaussianDensityNetwork(GaussianDensityNetworkBase):
+    def __init__(self, d_x, d_theta, d_model, lr, weight_decay,
+                 mean_field, embed_dim):
+        super().__init__(d_theta, lr, weight_decay,
+                 mean_field)
+        self.embed_dim = embed_dim
+        if type(d_x) == torch.Size:
+            assert self.embed_dim
+        if self.embed_dim:
+            self.embed = torch.nn.Linear(d_x[1], embed_dim)
+            d_x = embed_dim * d_x[0]
+            # does this actually do anything...
+            # at best, preserves the time dimension first
+        self.ff = torch.nn.Sequential(
+            Linear(d_x, d_model),
+            ReLU(),
+            Linear(d_model, d_model),
+            ReLU(),
+            Linear(d_model, d_model),
+            ReLU(),
+            Linear(d_model, self.n_outputs),
+        )
+        # eventually need to save this as an hparam if i am checkpointing models
+        self.lr = lr
+        self.wd = weight_decay
+        self.mean_field = mean_field
+        self.val_losses = []
+        
+    def encoder(self, x):
+        if self.embed_dim:
+            x = self.embed(x)
+            x = x.flatten(1, -1)
+        return self.ff(x)
+
     
-    # does it make sense to have a "sample" method?
     
-    
-class GaussianDensityTransformer(GaussianDensityNetwork):
+class GaussianDensityTransformer(GaussianDensityNetworkBase):
     def __init__(self, d_x, d_theta, d_model, lr, weight_decay,
                 mean_field, n_heads, dropout, n_blocks):
-        super().__init__(d_x, d_theta, d_model, lr, weight_decay,
-                mean_field, embed_dim=0)
-        self.name = "transformer"
-        
+        super().__init__(d_theta, lr, weight_decay,
+                mean_field)
         
         self.pos_encode = PositionalEncoding(d_model)
         encoder_layer = torch.nn.TransformerEncoderLayer(
@@ -127,12 +139,16 @@ class GaussianDensityTransformer(GaussianDensityNetwork):
             nhead=n_heads,
             dropout=dropout,
             batch_first=True,
-            dim_feedforward=d_model*4
+            dim_feedforward=d_model*4 # it's a heuristic idk
         )
         norm = torch.nn.LayerNorm(d_model)
-        self.embed = Linear(d_x, d_model)
+        assert type(d_x) == torch.Size
+        self.embed = Linear(d_x[1], d_model)
         self.transformer = torch.nn.TransformerEncoder(encoder_layer, n_blocks, norm)
-        self.to_output()
+        self.to_output = torch.nn.Sequential(
+            ReLU(),
+            Linear(d_model, self.n_outputs),
+        )
         
     def encoder(self, x):
         x = self.embed(x)
@@ -141,6 +157,7 @@ class GaussianDensityTransformer(GaussianDensityNetwork):
         # pooling operation
         # averaging makes the most intuitive sense imo
         y = y.mean(dim=1)
+        return self.to_output(y)
         
         
         

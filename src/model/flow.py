@@ -30,8 +30,12 @@ class BaseFlow(L.LightningModule):
     def sample(self, sample_size, cond_inputs=None):
         if self.device != cond_inputs.device:
             cond_inputs = cond_inputs.to(self.device)
-        if cond_inputs.shape[0] == 1:
+        assert cond_inputs.shape[0] == 1
+        dim = len(cond_inputs.shape)
+        if dim == 2:
             cond_inputs = cond_inputs.repeat(sample_size, 1)
+        elif dim == 3:
+            cond_inputs = cond_inputs.repeat(sample_size, 1, 1)
         Z = self.dist.rsample((sample_size,))
         return self.inverse(Z, Y=cond_inputs)
     
@@ -112,15 +116,16 @@ class RealNVP(BaseFlow):
 
     def __init__(
         self,
-        d_x,
+        d_theta,
         n_layers,
         d_model,
         lr,
         weight_decay,
-        d_theta=0
+        embed_dim,
+        d_x=0,
     ):
         super().__init__(lr, weight_decay)
-        self.name = "flow"
+        self.estimator = "flow"
         self.register_buffer("loc", torch.zeros(d_theta, device=self.device))
         self.register_buffer("cov", torch.eye(d_theta, device=self.device))
         
@@ -128,7 +133,14 @@ class RealNVP(BaseFlow):
         # assign as attribute to register parameters correctly
         self.flows = torch.nn.ModuleList()
         # define target, latent distribution
-
+        
+        # TODO: add integration with transformer for embedding
+        self.embed_dim = embed_dim
+        if type(d_x) == torch.Size:
+            assert self.embed_dim
+        if self.embed_dim:
+            self.embed = torch.nn.Linear(d_x[1], embed_dim)
+            d_x = embed_dim * d_x[0]
         for _ in range(n_layers):
             self.flows.append(
                 CouplingFlow(d_theta, d_model, mask, d_x)
@@ -141,6 +153,10 @@ class RealNVP(BaseFlow):
         
         
     def forward(self, X, Y=None):
+        if self.embed_dim:
+            Y = self.embed(Y)
+            Y  = Y.flatten(1, -1)
+        assert len(Y.shape) == 2
         log_det_sum = torch.zeros(X.size(0), device=self.device) # device=U.device
         for module in self.flows:
             Z, log_det = module.forward(X, Y)
@@ -149,6 +165,9 @@ class RealNVP(BaseFlow):
         return Z, log_det_sum
 
     def inverse(self, Z, Y=None):
+        if self.embed_dim:
+            Y = self.embed(Y)
+            Y  = Y.flatten(1, -1)
         for module in reversed(self.flows):
             X = module.inverse(Z, Y)
             Z = X
