@@ -10,7 +10,8 @@ import os
 
 class PhyloSimulator(Simulator):
     def __init__(self, beta_true, prior_mu, prior_sigma, observed_seed, 
-                 time_first, n_sample=None, notebook_mode=False, log_scale=True):
+                 time_first, n_sample=None, notebook_mode=False, log_scale=True,
+                 flatten=False):
         self.n_sample = n_sample
         prefix = ".." if notebook_mode else get_original_cwd()
         self.W = pd.read_csv(f"{prefix}/sim_data/facility_trace.csv").values
@@ -34,6 +35,7 @@ class PhyloSimulator(Simulator):
         self.time_first = time_first
         self.d_x = None
         self.n_sample = n_sample
+        self.flatten = flatten
         if n_sample is not None:
             self.data, self.theta = self.simulate_data()
             self.d_x  = self.data[0].shape # here goes nothing
@@ -41,6 +43,8 @@ class PhyloSimulator(Simulator):
     
     def simulate_data(self):
         thetas = self.sample_logbeta(self.n_sample).float()
+        if not self.log_scale:
+            thetas = np.exp(thetas)
         xs = []
         for i in range(self.n_sample):
             seed = 3*i
@@ -68,8 +72,10 @@ class PhyloSimulator(Simulator):
         
     
     def simulate(self, theta, seed):
-        beta = np.exp(theta)
-        
+        if self.log_scale:
+            beta = np.exp(theta)
+        else:
+            beta = theta
         np.random.seed(seed)
         M = 100
         N, T = self.W.shape
@@ -105,35 +111,34 @@ class PhyloSimulator(Simulator):
             # if there is a newly screened case, add a new cluster
             # otherwise, assign "no cluster" to a negative admission
             K[:, t] = np.where(newly_admitted, self.L, K[:, t])
-            # case 3: already admitted and susceptible
-            # randomly model transmission event
-            # otherwise, inherit old status
-            staying = self.W[:, t] * w
             # who was infected at the last timestep?
-            Ia = x[w > 0] # 
+            Ia = x[w > 0]
+            # set up hazard matrix: [i, j] entry is contribution 
+            # from patient j acting on patient i
+            # facility effect
             hazard = Ia * beta[0] * np.ones(M) / capacity[0]
             hazard = np.tile(hazard, (M, 1))
-            fa = f[w > 0].astype(int)
+            # floor effect
+            fa = f[w > 0].astype(int) + 1
             fC = contact_matrix(fa)
-            # guarantee that there are no infecteds who aren't present
-            # how many infected floormates?
             hazard += (fC * Ia) * beta[fa] / capacity[fa]
+            # room effect
             ra = r[w > 0].astype(int)
             rC = contact_matrix(ra)
             infected_roommates = (rC * Ia)
             room_count[t-1] = (infected_roommates.sum(1) > 1).sum()
             hazard += infected_roommates * beta[-1] / capacity[-1]
-            # new approach: keep hazard as an NxN matrix
             p = np.zeros(N)
-            p[self.W[:, t] > 0] = 1 - np.exp(-hazard.sum(1))
-            # this may be the wrong approach..
+            # reinsert M probabilities (for present patients)
+            # into N total patient indices
+            p[w > 0] = 1 - np.exp(-hazard.sum(1))
+            # third case: already admitted and susceptible
+            # simulate infection as a bernoulli random variable
+            staying = self.W[:, t] * w
             X[:, t] = np.where(staying * (x == 0), np.random.binomial(1, p, N), X[:, t])
-            
             # compute cluster assignment probabilities
             ka = k[w > 0].astype(int)
             kI = np.eye(N_k+1)[ka].T[1:] # ignore contribution from "zero cluster"
-            
-            # produce an N x N array such that summed up it's equal to the hazard..
             # this is calculating the individual hazard contribution from each donor
             cluster_scores = kI @ hazard.T
             # normalize scores to probabilities
