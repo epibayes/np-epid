@@ -10,7 +10,7 @@ SCALE = [129., 28., 38., 35., 27., 17., 2]
 class CRKPTransmissionSimulator(Simulator):
     def __init__(self, path, prior_mu, prior_sigma, n_sample=None,
                  heterogeneous=True, name=None,
-                 flatten=False, N=False, pi=None):
+                 flatten=False, N=False, pi=None, return_case_count=False):
         self.n_sample = n_sample
         self.het = heterogeneous
         self.cap = np.array(SCALE)
@@ -33,6 +33,7 @@ class CRKPTransmissionSimulator(Simulator):
             self.pi = None
         self.d_x = self.T * self.d_theta
         self.flatten = flatten # set false for ABC
+        self.return_case_count = return_case_count
         if n_sample is not None:
             self.data, self.theta = self.simulate_data()
 
@@ -82,10 +83,10 @@ class CRKPTransmissionSimulator(Simulator):
         if seed is not None:
             np.random.seed(seed)
         beta = np.exp(logbeta)
-        beta_0 = beta[0] if self.het else beta
-        N, T = self.W.shape
         if self.pi is not None:
             beta = beta * self.pi
+        beta_0 = beta[0] if self.het else beta
+        N, T = self.W.shape
         X = np.empty((N, T))
         # load screen data for first day
         X[:, 0] = self.V[:, 0]
@@ -148,6 +149,10 @@ class CRKPTransmissionSimulator(Simulator):
         if not (self.het or show_full_data):
             data = data[0]
 
+        if self.return_case_count:
+            case_count = (X == 1).any(1).sum()
+            return data, case_count
+        
         return data
 
     def sample_logbeta(self, N, seed=None):

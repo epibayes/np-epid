@@ -58,10 +58,19 @@ def contact_matrix(arr):
 
 
 def categorical_sample(p):
-    s = p.cumsum(axis=0)
-    r = np.random.rand(p.shape[1])
-    k = (s < r).sum(axis=0)
-    return k
+    p = np.nan_to_num(p)
+    K, M = p.shape
+    sample = np.empty(M)
+    # this could possibly be optimized
+    for m in range(M):
+        probs = p[:, m]
+        # freaking floating point error.
+        if probs.sum() == 0:
+            sample[m] = 0
+        else:
+            sample[m] = np.random.choice(K, p=probs) + 1
+    
+    return sample
 
 def save_results(posterior_params, val_losses, cfg, name):
     # special case for homogeneous models

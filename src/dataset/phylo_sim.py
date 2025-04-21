@@ -131,7 +131,7 @@ class PhyloSimulator(Simulator):
             p = np.zeros(N)
             # reinsert M probabilities (for present patients)
             # into N total patient indices
-            p[w > 0] = 1 - np.exp(-hazard.sum(1))
+            p[self.W[:, t] > 0] = 1 - np.exp(-hazard.sum(1))
             # third case: already admitted and susceptible
             # simulate infection as a bernoulli random variable
             staying = self.W[:, t] * w
@@ -144,16 +144,14 @@ class PhyloSimulator(Simulator):
             # normalize scores to probabilities
             with np.errstate(divide="ignore", invalid="ignore"):
                 cluster_probs = cluster_scores / cluster_scores.sum(0)
-                cluster_probs = np.where(np.isnan(cluster_probs), 1, cluster_probs)
-                
-            
             cluster_assignments = categorical_sample(cluster_probs)
             kb = np.zeros(N)
-            
-            kb[self.W[:, t] > 0] = cluster_assignments + 1 
+            kb[self.W[:, t] > 0] = cluster_assignments 
+            # new infection? assign cluster
             K[:, t] = np.where((X[:, t] == 1) * (x == 0), kb, K[:, t])
-            
+            # if X is positive, cluster assignment should be nonzero
             # cluster overlap by room
+            assert K[:, t][X[:, t] == 1].min() > 0
             roommate_clusters = rC * ka
             for rk in roommate_clusters:
                 nonzero_ix = np.nonzero(rk)
@@ -192,14 +190,15 @@ class PhyloSimulator(Simulator):
         demog = np.stack(demog)
         # genomic data
         cluster_counts = np.zeros((N_k, T))
-        cluster_floor_counts = np.zeros((N_k, self.N_f, T))
+        cluster_floor_counts = np.zeros((self.N_f, N_k, T))
         for t in range(T):
             for n in range(N):
+                x = X[n, t]
                 k = K[n, t]
                 f = self.F[n, t]
                 if k and not np.isnan(k):
                     cluster_counts[int(k)-1, t] += 1
-                    cluster_floor_counts[int(k)-1, int(f), t] += 1
+                    cluster_floor_counts[int(f), int(k)-1, t] += 1
                     
         genom = np.concatenate([
             cluster_counts, 
