@@ -125,6 +125,26 @@ class GaussianDensityNetwork(GaussianDensityNetworkBase):
             x = x.flatten(1, -1)
         return self.ff(x)
 
+class GaussianDensityRNN(GaussianDensityNetworkBase):
+    def __init__(self, d_x, d_theta, d_model, lr, weight_decay,
+                mean_field, n_layers, dropout):
+        super().__init__(d_theta, lr, weight_decay,
+                mean_field)
+        
+        self.LSTM = torch.nn.LSTM(
+            input_size=d_x, hidden_size=d_model, num_layers=n_layers,
+            dropout=dropout, batch_first=True, 
+        )
+        self.to_output = torch.nn.Sequential(
+            ReLU(),
+            Linear(d_model, self.n_outputs)
+        )
+        
+    def encoder(self, x):
+        x = self.embed(x)
+        y = self.LSTM(x)
+        y = y.mean(dim=1)
+        return self.to_output(y)
     
     
 class GaussianDensityTransformer(GaussianDensityNetworkBase):

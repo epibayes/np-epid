@@ -5,13 +5,13 @@ from .simulator import Simulator
 from ..utils import contact_matrix, categorical_sample
 from torch.distributions import MultivariateNormal
 from hydra.utils import get_original_cwd
-import os
 
+# TODO: figure out how to load from memory
 
 class PhyloSimulator(Simulator):
     def __init__(self, beta_true, prior_mu, prior_sigma, observed_seed, 
                  time_first, n_sample=None, notebook_mode=False, log_scale=True,
-                 flatten=False):
+                 flatten=False, load_data=False):
         self.n_sample = n_sample
         prefix = ".." if notebook_mode else get_original_cwd()
         self.W = pd.read_csv(f"{prefix}/sim_data/facility_trace.csv").values
@@ -36,10 +36,28 @@ class PhyloSimulator(Simulator):
         self.d_x = None
         self.n_sample = n_sample
         self.flatten = flatten
-        if n_sample is not None:
-            self.data, self.theta = self.simulate_data()
-            self.d_x  = self.data[0].shape # here goes nothing
-        
+        if n_sample:
+            simulate = True
+            if load_data:
+                try:
+                    print("Loading training data...")
+                    self.data = torch.load(f"{prefix}/sim_data/phylo_data_{n_sample}.pt",
+                                           weights_only=True)
+                    self.theta = torch.load(f"{prefix}/sim_data/phylo_theta_{n_sample}.pt",
+                                            weights_only=True)
+                    simulate = False
+                except FileNotFoundError:
+                    print("Saved training data not found!")
+            if simulate:
+                print("Simulating training data...")
+                self.data, self.theta = self.simulate_data()
+                print("Writing out simulated data...")
+                torch.save(self.data, f"{prefix}/sim_data/phylo_data_{n_sample}.pt")
+                torch.save(self.theta, f"{prefix}/sim_data/phylo_theta_{n_sample}.pt")
+            
+            self.d_x  = self.data[0].shape
+            
+            
     
     def simulate_data(self):
         thetas = self.sample_logbeta(self.n_sample).float()
@@ -131,7 +149,7 @@ class PhyloSimulator(Simulator):
             p = np.zeros(N)
             # reinsert M probabilities (for present patients)
             # into N total patient indices
-            p[self.W[:, t] > 0] = 1 - np.exp(-hazard.sum(1))
+            p[w > 0] = 1 - np.exp(-hazard.sum(1))
             # third case: already admitted and susceptible
             # simulate infection as a bernoulli random variable
             staying = self.W[:, t] * w
@@ -146,7 +164,7 @@ class PhyloSimulator(Simulator):
                 cluster_probs = cluster_scores / cluster_scores.sum(0)
             cluster_assignments = categorical_sample(cluster_probs)
             kb = np.zeros(N)
-            kb[self.W[:, t] > 0] = cluster_assignments 
+            kb[w > 0] = cluster_assignments 
             # new infection? assign cluster
             K[:, t] = np.where((X[:, t] == 1) * (x == 0), kb, K[:, t])
             # if X is positive, cluster assignment should be nonzero
