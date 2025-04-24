@@ -6,7 +6,6 @@ from ..utils import contact_matrix, categorical_sample
 from torch.distributions import MultivariateNormal
 from hydra.utils import get_original_cwd
 
-# TODO: figure out how to load from memory
 
 class PhyloSimulator(Simulator):
     def __init__(self, beta_true, prior_mu, prior_sigma, observed_seed, 

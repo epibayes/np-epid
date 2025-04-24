@@ -1,0 +1,5 @@
+_target_: src.model.gdn.GaussianDensityRNN
+d_model: 16
+mean_field: False
+dropout: 0
+n_layers: 1

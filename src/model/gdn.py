@@ -132,7 +132,7 @@ class GaussianDensityRNN(GaussianDensityNetworkBase):
                 mean_field)
         
         self.LSTM = torch.nn.LSTM(
-            input_size=d_x, hidden_size=d_model, num_layers=n_layers,
+            input_size=d_x[1], hidden_size=d_model, num_layers=n_layers,
             dropout=dropout, batch_first=True, 
         )
         self.to_output = torch.nn.Sequential(
@@ -141,8 +141,7 @@ class GaussianDensityRNN(GaussianDensityNetworkBase):
         )
         
     def encoder(self, x):
-        x = self.embed(x)
-        y = self.LSTM(x)
+        y, _ = self.LSTM(x)
         y = y.mean(dim=1)
         return self.to_output(y)
     

@@ -1,4 +1,4 @@
-_target_: src.model.GaussianDensityTransformer
+_target_: src.model.gdn.GaussianDensityTransformer
 d_model: 16
 mean_field: False
 n_heads: 4
