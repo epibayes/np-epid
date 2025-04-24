@@ -44,6 +44,7 @@ class PhyloSimulator(Simulator):
                                            weights_only=True)
                     self.theta = torch.load(f"{prefix}/sim_data/phylo_theta_{n_sample}.pt",
                                             weights_only=True)
+                    if log_scale: self.theta = torch.log(self.theta)
                     simulate = False
                 except FileNotFoundError:
                     print("Saved training data not found!")
@@ -52,7 +53,8 @@ class PhyloSimulator(Simulator):
                 self.data, self.theta = self.simulate_data()
                 print("Writing out simulated data...")
                 torch.save(self.data, f"{prefix}/sim_data/phylo_data_{n_sample}.pt")
-                torch.save(self.theta, f"{prefix}/sim_data/phylo_theta_{n_sample}.pt")
+                theta_out = torch.exp(self.theta) if log_scale else self.theta
+                torch.save(theta_out, f"{prefix}/sim_data/phylo_theta_{n_sample}.pt")
             
             self.d_x  = self.data[0].shape
             
