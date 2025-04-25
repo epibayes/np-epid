@@ -38,14 +38,14 @@ def main(cfg):
                         fast_dev_run=cfg.fast_dev_run)
 
     trainer.fit(model, datamodule=datamodule)
+    posterior_params = None
     if model.estimator == "gdn":
         posterior_params = model.predict_step(observed_data)
         if dataset.name in TOY_EXPERIMENTS:
             dataset.evaluate(posterior_params)
-        else:
-            save_results(posterior_params, model.val_losses, cfg, dataset.name)
-    elif model.estimator == "flow":
-        # TODO: figure out logic for saving results from normalizing flows
+
+    save_results(posterior_params, model.val_losses, cfg, dataset.name)
+    if cfg.flow_sample:
         with no_grad():
             M = cfg.n_posterior_sample
             sample = model.to(gpu).sample(

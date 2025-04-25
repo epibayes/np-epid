@@ -76,21 +76,23 @@ def categorical_sample(p):
     return sample
 
 def save_results(posterior_params, val_losses, cfg, name):
-    # special case for homogeneous models
-    if name in ["si-model", "crkp"]:
-        mu = posterior_params[0].item()
-        sigma = posterior_params[1].item()
-        print(np.round(mu, 3))
-        print(np.round(sigma, 3))
-    else:
-        mu = posterior_params[0].tolist()
-        L = posterior_params[1]
-        sigma = (L @ L.T).tolist()
-        sdiag = (L @ L.T).diag().tolist()
-        print(np.round(mu, 3))
-        print(np.round(sdiag, 3)) # marginal variances
-    results = {"mu": mu, "sigma":sigma,
-               "val_loss": val_losses[-1]}
+    results = {"val_loss": val_losses[-1]}
+    if posterior_params:
+        # special case for homogeneous models
+        if name in ["si-model", "crkp"]:
+            mu = posterior_params[0].item()
+            sigma = posterior_params[1].item()
+            print(np.round(mu, 3))
+            print(np.round(sigma, 3))
+        else:
+            mu = posterior_params[0].tolist()
+            L = posterior_params[1]
+            sigma = (L @ L.T).tolist()
+            sdiag = (L @ L.T).diag().tolist()
+            print(np.round(mu, 3))
+            print(np.round(sdiag, 3)) # marginal variances
+        results["mu"] = mu
+        results["sigma"] = sigma
     for key in cfg["simulator"]:
         results[key] = cfg["simulator"][key]
     for key in cfg["model"]:
@@ -123,15 +125,12 @@ def get_results(path, multirun=True):
                 else:
                     data[k].append(v)
     data = pd.DataFrame(data)
+    # in practice, i don't tune these hyperparameters
     for c in ["_target_", "lr", "batch_size", "dropout", "seed"]:
         try:
             data.drop(columns = c, inplace=True)
         except KeyError:
             print(f"Missing column {c}")
-    # try:
-    #     data.drop(columns=["_target_", "lr", "batch_size", "dropout", "seed"])
-    # except KeyError: # in later iterations, i'm not saving dropout or seed...this is hacky
-    #     data.drop(columns=["_target_", "lr", "batch_size"])
     return data
         
 # LIKELIHOOD BASED ESTIMATION

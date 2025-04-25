@@ -12,7 +12,7 @@ train:
   seed: 11 # random seed for training/validation split
   max_epochs: 1000
   log_freq: 4
-  patience: 50
+  patience: 20
   stop_early: True
   devices: auto
 
@@ -26,6 +26,8 @@ fast_dev_run: False
 n_posterior_sample: 100
 
 gpu_device: "mps"
+
+flow_sample: False
 
 hydra:
   job:

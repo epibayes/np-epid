@@ -98,7 +98,8 @@ class GaussianDensityNetwork(GaussianDensityNetworkBase):
                  mean_field)
         self.embed_dim = embed_dim
         if type(d_x) == torch.Size:
-            assert self.embed_dim
+            try: assert self.embed_dim
+            except AssertionError: print("Need to define an embedding dimension!")
         if self.embed_dim:
             self.embed = torch.nn.Linear(d_x[1], embed_dim)
             d_x = embed_dim * d_x[0]
