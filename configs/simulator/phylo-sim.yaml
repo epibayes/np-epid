@@ -4,5 +4,5 @@ prior_mu: -3
 prior_sigma: 1
 observed_seed: 30
 time_first: True
-log_scale: False
+log_scale: True
 load_data: True

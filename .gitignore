@@ -9,6 +9,7 @@ multirun
 .ipynb_checkpoints
 experiments.md
 *.csv
+!sim_data/*.csv
 *.png
 *.npy
 *.pt

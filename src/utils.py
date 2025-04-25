@@ -123,10 +123,15 @@ def get_results(path, multirun=True):
                 else:
                     data[k].append(v)
     data = pd.DataFrame(data)
-    try:
-        data.drop(columns=["_target_", "lr", "batch_size", "dropout", "seed"])
-    except KeyError: # in later iterations, i'm not saving dropout or seed...this is hacky
-        data.drop(columns=["_target_", "lr", "batch_size"])
+    for c in ["_target_", "lr", "batch_size", "dropout", "seed"]:
+        try:
+            data.drop(columns = c, inplace=True)
+        except KeyError:
+            print(f"Missing column {c}")
+    # try:
+    #     data.drop(columns=["_target_", "lr", "batch_size", "dropout", "seed"])
+    # except KeyError: # in later iterations, i'm not saving dropout or seed...this is hacky
+    #     data.drop(columns=["_target_", "lr", "batch_size"])
     return data
         
 # LIKELIHOOD BASED ESTIMATION
