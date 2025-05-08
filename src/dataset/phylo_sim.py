@@ -10,7 +10,7 @@ from hydra.utils import get_original_cwd
 class PhyloSimulator(Simulator):
     def __init__(self, beta_true, prior_mu, prior_sigma, observed_seed, 
                  time_first, n_sample=None, notebook_mode=False, log_scale=True,
-                 flatten=False, load_data=False):
+                 flatten=False, load_data=False, epid_only=False):
         self.n_sample = n_sample
         prefix = ".." if notebook_mode else get_original_cwd()
         self.W = pd.read_csv(f"{prefix}/sim_data/facility_trace.csv").values
@@ -35,14 +35,16 @@ class PhyloSimulator(Simulator):
         self.d_x = None
         self.n_sample = n_sample
         self.flatten = flatten
+        self.epid_only = epid_only
+        postfix = "_epid_only" if epid_only else ""
         if n_sample:
             simulate = True
             if load_data:
                 try:
                     print("Loading training data...")
-                    self.data = torch.load(f"{prefix}/sim_data/phylo_data_{n_sample}.pt",
+                    self.data = torch.load(f"{prefix}/sim_data/phylo_data_{n_sample}{postfix}.pt",
                                            weights_only=True)
-                    self.theta = torch.load(f"{prefix}/sim_data/phylo_theta_{n_sample}.pt",
+                    self.theta = torch.load(f"{prefix}/sim_data/phylo_theta_{n_sample}{postfix}.pt",
                                             weights_only=True)
                     if log_scale: self.theta = torch.log(self.theta)
                     simulate = False
@@ -52,11 +54,12 @@ class PhyloSimulator(Simulator):
                 print("Simulating training data...")
                 self.data, self.theta = self.simulate_data()
                 print("Writing out simulated data...")
-                torch.save(self.data, f"{prefix}/sim_data/phylo_data_{n_sample}.pt")
+                torch.save(self.data, f"{prefix}/sim_data/phylo_data_{n_sample}{postfix}.pt")
                 theta_out = torch.exp(self.theta) if log_scale else self.theta
-                torch.save(theta_out, f"{prefix}/sim_data/phylo_theta_{n_sample}.pt")
+                torch.save(theta_out, f"{prefix}/sim_data/phylo_theta_{n_sample}{postfix}.pt")
             
-            self.d_x  = self.data[0].shape
+            # no need to embed if it's just epid data
+            self.d_x  = self.data[0].shape[0] if self.epid_only else self.data[0].shape
             
             
     
@@ -155,6 +158,8 @@ class PhyloSimulator(Simulator):
             # simulate infection as a bernoulli random variable
             staying = self.W[:, t] * w
             X[:, t] = np.where(staying * (x == 0), np.random.binomial(1, p, N), X[:, t])
+            if self.epid_only:
+                continue
             # compute cluster assignment probabilities
             ka = k[w > 0].astype(int)
             kI = np.eye(N_k+1)[ka].T[1:] # ignore contribution from "zero cluster"
@@ -176,9 +181,9 @@ class PhyloSimulator(Simulator):
                 nonzero_ix = np.nonzero(rk)
                 unique, counts = np.unique(rk[nonzero_ix], return_counts=True)
                 for u, c in zip(unique, counts):
-                    if c > 1: # multiple patients of the same cluster type
-                        room_cluster[u-1, t] = c
-            
+                    if c > 1: # there are roommates with the same cluster!
+                        room_cluster[u-1, t] += 1
+        
             
         w = self.W[:, T-1]
         ra = self.R[:, T-1][w > 0]
@@ -186,15 +191,16 @@ class PhyloSimulator(Simulator):
         Ia = X[:, T-1][w > 0]
         infected_roommates = (rC * Ia).sum(1)
         room_count[T-1] = (infected_roommates > 1).sum()
-        # compute last room cluster overlap
-        ka = K[:, T-1][w > 0].astype(int)
-        roommate_clusters = rC * ka
-        for rk in roommate_clusters:
-            nonzero_ix = np.nonzero(rk)
-            unique, counts = np.unique(rk[nonzero_ix], return_counts=True)
-            for u, c in zip(unique, counts):
-                if c > 1:
-                    room_cluster[u-1, T-1] = c
+        if not self.epid_only:
+            # compute last room cluster overlap
+            ka = K[:, T-1][w > 0].astype(int)
+            roommate_clusters = rC * ka
+            for rk in roommate_clusters:
+                nonzero_ix = np.nonzero(rk)
+                unique, counts = np.unique(rk[nonzero_ix], return_counts=True)
+                for u, c in zip(unique, counts):
+                    if c > 1:
+                        room_cluster[u-1, T-1] += 1
         
         
         # start writing out data
@@ -207,6 +213,8 @@ class PhyloSimulator(Simulator):
             demog.append(floor_count)
         demog.append(room_count)
         demog = np.stack(demog)
+        if self.epid_only:
+            return torch.from_numpy(demog).flatten()
         # genomic data
         cluster_counts = np.zeros((N_k, T))
         cluster_floor_counts = np.zeros((self.N_f, N_k, T))

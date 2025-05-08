@@ -6,3 +6,4 @@ observed_seed: 30
 time_first: True
 log_scale: True
 load_data: True
+epid_only: False

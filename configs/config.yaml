@@ -23,11 +23,9 @@ model:
 log: True
 fast_dev_run: False
 
-n_posterior_sample: 100
+n_posterior_sample: 0 # for sampling from normalizing flows
 
 gpu_device: "mps"
-
-flow_sample: False
 
 hydra:
   job:

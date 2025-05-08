@@ -45,7 +45,7 @@ def main(cfg):
             dataset.evaluate(posterior_params)
 
     save_results(posterior_params, model.val_losses, cfg, dataset.name)
-    if cfg.flow_sample:
+    if cfg.n_posterior_sample:
         with no_grad():
             M = cfg.n_posterior_sample
             sample = model.to(gpu).sample(
