@@ -14,7 +14,7 @@ class CRKPTransmissionSimulator(Simulator):
         self.n_sample = n_sample
         self.het = heterogeneous
         self.cap = np.array(SCALE)
-        self.d_theta = 7 if self.het else 1 # five* floors, facility and room level transmission rates
+        self.d_theta = 7 if self.het else 1 # five floors, facility and room level transmission rates
         self.set_prior(prior_mu, prior_sigma)
         # who is present when?
         self.W = pd.read_csv(f"{path}/facility_trace.csv", index_col=0).values
@@ -31,7 +31,7 @@ class CRKPTransmissionSimulator(Simulator):
                 self.pi = np.array(pi)
         else:
             self.pi = None
-        self.d_x = self.T * self.d_theta
+        self.d_x = self.T
         self.flatten = flatten # set false for ABC
         self.return_case_count = return_case_count
         if n_sample is not None:
@@ -39,6 +39,7 @@ class CRKPTransmissionSimulator(Simulator):
 
         self.x_o = self.load_observed_data(path)
         self.name = name
+        self.mask = self.W
         
 
     def set_prior(self, mu, sigma):
@@ -52,14 +53,16 @@ class CRKPTransmissionSimulator(Simulator):
             self.prior_sigma = sigma
 
     def load_observed_data(self, path):
-        with open(f"{path}/observed_data.npy", "rb") as f:
-            x = np.load(f)
-        # scale    
-        x = x / self.L
-        if self.het:
-            return torch.tensor(x)
-        else:
-            return torch.tensor(x[0,:]).unsqueeze(0)
+        x = pd.read_csv(f"{path}/infections.csv", index_col=0).values
+        return torch.tensor(x).unsqueeze(0)
+        # with open(f"{path}/observed_data.npy", "rb") as f:
+        #     x = np.load(f)
+        # # scale    
+        # x = x / self.L
+        # if self.het:
+        #     return torch.tensor(x)
+        # else:
+        #     return torch.tensor(x[0,:]).unsqueeze(0)
 
     def get_observed_data(self):
         obs = self.x_o
@@ -70,16 +73,17 @@ class CRKPTransmissionSimulator(Simulator):
     
     def simulate_data(self):
         logbetas = self.sample_logbeta(self.n_sample, seed=5)
-        xs = torch.empty((self.n_sample, self.d_x))
+        # xs = torch.empty((self.n_sample, self.d_x))
+        xs = torch.empty(self.n_sample, self.N, self.T)
         for i in range(self.n_sample):
             rs = 5 * i
             xs[i] = self.CRKP_simulator(
                 np.array(logbetas[i]), rs
-                ).flatten()
+                )
 
         return xs, logbetas.float()
     
-    def CRKP_simulator(self, logbeta, seed=None, show_full_data=False):
+    def CRKP_simulator(self, logbeta, seed=None, summarize=False):
         if seed is not None:
             np.random.seed(seed)
         beta = np.exp(logbeta)
@@ -125,35 +129,39 @@ class CRKPTransmissionSimulator(Simulator):
             p = 1 - np.exp(-hazard) # not the end of the world to normalize by size of population
             X[:, t] = np.where(staying * (x == 0), np.random.binomial(1, p, N), X[:, t])
 
-        
-        # compute last entry of room count
-        r = self.R[:, T-1]
-        w = self.W[:, T-1]
-        x = X[:, T-1]
-        ra = r[w > 0]
-        rC = contact_matrix(ra)
-        Ia = x[w > 0]
-        infected_roommates = (rC * Ia).sum(1)
-        room_count[T-1] = (infected_roommates > 1).sum()
+        if summarize:
+            
+            # compute last entry of room count
+            r = self.R[:, T-1]
+            w = self.W[:, T-1]
+            x = X[:, T-1]
+            ra = r[w > 0]
+            rC = contact_matrix(ra)
+            Ia = x[w > 0]
+            infected_roommates = (rC * Ia).sum(1)
+            room_count[T-1] = (infected_roommates > 1).sum()
 
-        total_count = np.nansum(X, axis=0)
+            total_count = np.nansum(X, axis=0)
 
-        floor_counts = []
-        for i in [1,2,3,4,6]:
-            # does this work with matrix indexing?
-            floor_count = np.nansum(X * (self.F == i), axis=0)
-            floor_counts.append(floor_count)
-        stats = [total_count] + floor_counts + [room_count]
-        data = torch.tensor(np.stack(stats)).float() / self.L
+            floor_counts = []
+            for i in [1,2,3,4,6]:
+                # does this work with matrix indexing?
+                floor_count = np.nansum(X * (self.F == i), axis=0)
+                floor_counts.append(floor_count)
+            stats = [total_count] + floor_counts + [room_count]
+            data = torch.tensor(np.stack(stats)).float() / self.L
+            
+            if not self.het: data = data[0]
+            
+            return data
         
-        if not (self.het or show_full_data):
-            data = data[0]
+        else:
+            return torch.tensor(X)
 
-        if self.return_case_count:
-            case_count = (X == 1).any(1).sum()
-            return data, case_count
-        
-        return data
+        # if self.return_case_count:
+        #     case_count = (X == 1).any(1).sum()
+        #     return data, case_count
+
 
     def sample_logbeta(self, N, seed=None):
         if seed is not None:

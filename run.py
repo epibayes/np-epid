@@ -21,7 +21,8 @@ def main(cfg):
     datamodule = DataModule(
         dataset, cfg.train.seed, batch_size, cfg.train.train_frac
         )
-    model = instantiate(cfg.model, d_x=dataset.d_x, d_theta=dataset.d_theta)
+    model = instantiate(cfg.model, d_x=dataset.d_x, d_theta=dataset.d_theta,
+                        mask=dataset.mask)
     if cfg.log:
         wandb.init(reinit=False)
         logger = WandbLogger(project='crkp')

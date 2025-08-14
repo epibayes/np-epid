@@ -9,6 +9,7 @@ class Simulator(Dataset):
         self.d_x = None
         self.d_theta = None
         self.name = None
+        self.mask = None
 
     def __len__(self):
         return self.n_sample
