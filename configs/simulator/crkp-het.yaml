@@ -6,3 +6,4 @@ prior_mu: -3
 prior_sigma: 1
 flatten: True
 name: "crkp-het"
+summarize: False

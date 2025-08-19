@@ -10,7 +10,8 @@ SCALE = [129., 28., 38., 35., 27., 17., 2]
 class CRKPTransmissionSimulator(Simulator):
     def __init__(self, path, prior_mu, prior_sigma, n_sample=None,
                  heterogeneous=True, name=None,
-                 flatten=False, N=False, pi=None, return_case_count=False):
+                 flatten=False, N=None,
+                 summarize=False, pi=None, return_case_count=False):
         self.n_sample = n_sample
         self.het = heterogeneous
         self.cap = np.array(SCALE)
@@ -31,15 +32,19 @@ class CRKPTransmissionSimulator(Simulator):
                 self.pi = np.array(pi)
         else:
             self.pi = None
-        self.d_x = self.T
+        if summarize:
+            self.d_x = self.T * self.d_theta
+        else:
+            self.d_x = self.T
         self.flatten = flatten # set false for ABC
         self.return_case_count = return_case_count
         if n_sample is not None:
-            self.data, self.theta = self.simulate_data()
+            self.data, self.theta = self.simulate_data(summarize)
 
-        self.x_o = self.load_observed_data(path)
+        self.x_o = self.load_observed_data(path, summarize)
         self.name = name
         self.mask = self.W
+        self.summarize=summarize
         
 
     def set_prior(self, mu, sigma):
@@ -52,38 +57,45 @@ class CRKPTransmissionSimulator(Simulator):
             self.prior_mu = mu
             self.prior_sigma = sigma
 
-    def load_observed_data(self, path):
-        x = pd.read_csv(f"{path}/infections.csv", index_col=0).values
-        return torch.tensor(x).unsqueeze(0)
-        # with open(f"{path}/observed_data.npy", "rb") as f:
-        #     x = np.load(f)
-        # # scale    
-        # x = x / self.L
-        # if self.het:
-        #     return torch.tensor(x)
-        # else:
-        #     return torch.tensor(x[0,:]).unsqueeze(0)
+    def load_observed_data(self, path, summarize):
+        if summarize:
+            with open(f"{path}/observed_data.npy", "rb") as f:
+                x = np.load(f)
+            # scale    
+            x = x / self.L
+            if self.het:
+                return torch.tensor(x)
+            else:
+                return torch.tensor(x[0,:]).unsqueeze(0)
+        else:
+            x = pd.read_csv(f"{path}/infections.csv", index_col=0).values
+            return torch.tensor(x).unsqueeze(0)
+
 
     def get_observed_data(self):
         obs = self.x_o
-        if self.flatten:
+        if self.flatten and self.summarize:
             obs =  obs.flatten().unsqueeze(0)
             
         return obs.float()
     
-    def simulate_data(self):
+    def simulate_data(self, summarize=False):
         logbetas = self.sample_logbeta(self.n_sample, seed=5)
-        # xs = torch.empty((self.n_sample, self.d_x))
-        xs = torch.empty(self.n_sample, self.N, self.T)
+        if summarize:
+            xs = torch.empty(self.n_sample, self.d_x)
+        else:
+            xs = torch.empty(self.n_sample, self.N, self.T)
         for i in range(self.n_sample):
             rs = 5 * i
-            xs[i] = self.CRKP_simulator(
-                np.array(logbetas[i]), rs
+            sim = self.CRKP_simulator(
+                np.array(logbetas[i]), rs, summarize=summarize
                 )
+            xs[i] = sim.flatten() if summarize else sim
+
 
         return xs, logbetas.float()
     
-    def CRKP_simulator(self, logbeta, seed=None, summarize=False):
+    def CRKP_simulator(self, logbeta, seed=None, summarize=False, show_full=False):
         if seed is not None:
             np.random.seed(seed)
         beta = np.exp(logbeta)
@@ -151,7 +163,8 @@ class CRKPTransmissionSimulator(Simulator):
             stats = [total_count] + floor_counts + [room_count]
             data = torch.tensor(np.stack(stats)).float() / self.L
             
-            if not self.het: data = data[0]
+            # need to tweak this
+            if not (self.het or show_full): data = data[0]
             
             return data
         

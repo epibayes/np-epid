@@ -93,27 +93,27 @@ class GaussianDensityNetworkBase(L.LightningModule):
 
 class GaussianDensityNetwork(GaussianDensityNetworkBase):
     def __init__(self, d_x, d_theta, d_model, lr, weight_decay,
-                 mean_field, embed_dim, mask):
+                 mean_field, d_summ, mask):
         super().__init__(d_theta, lr, weight_decay,
                  mean_field)
-        self.embed_dim = embed_dim
-        # if type(d_x) == torch.Size:
-        #     try: assert self.embed_dim
-        #     except AssertionError: print("Need to define an embedding dimension!")
-        if self.embed_dim:
+        self.d_summ = d_summ
+
+        if self.d_summ:
             self.embed = torch.nn.Sequential(
-                Linear(1, embed_dim),
+                Linear(1, d_summ),
                 ReLU(),
-                Linear(embed_dim, embed_dim*2),
+                Linear(d_summ, d_summ*2),
                 ReLU(),
-                Linear(embed_dim*2, embed_dim)
+                Linear(d_summ*2, d_summ)
             )
-        #     d_x = embed_dim * d_x[0]
-            # does this actually do anything...
-            # at best, preserves the time dimension first
-        # switch over to a two layer nn?
+            
+            first_dim = d_x * d_summ
+        else:
+            first_dim = d_x
+        # TODO: fix input dim
+
         self.ff = torch.nn.Sequential(
-            Linear(d_x * embed_dim, d_model),
+            Linear(first_dim , d_model),
             ReLU(),
             Linear(d_model, d_model),
             ReLU(),
@@ -129,8 +129,8 @@ class GaussianDensityNetwork(GaussianDensityNetworkBase):
         self.register_buffer("mask", torch.tensor(mask, device=self.device))
         
     def encoder(self, x):
-        # can this handle summary statistics?
-        if self.embed_dim:
+        # TODO: make sure this can handle pre-summarized data
+        if self.d_summ:
             x = torch.nan_to_num(x)
             x = self.embed(x.unsqueeze(-1))
             # need to mask!
