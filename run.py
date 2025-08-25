@@ -6,6 +6,7 @@ from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from hydra.utils import instantiate
 from src.utils import DataModule, save_results
 from torch import device, no_grad, exp
+from omegaconf import open_dict
 
 TOY_EXPERIMENTS = ("normal-normal", "bayes-linreg")
 
@@ -21,8 +22,18 @@ def main(cfg):
     datamodule = DataModule(
         dataset, cfg.train.seed, batch_size, cfg.train.train_frac
         )
-    model = instantiate(cfg.model, d_x=dataset.d_x, d_theta=dataset.d_theta,
-                        mask=dataset.mask)
+    if cfg.simulator.get("summarize"):
+        # if the data is already summarized, don't fit a summary network
+        assert cfg.model.get("d_summ") is None
+        
+    model = instantiate(cfg.model, d_x=dataset.d_x, d_theta=dataset.d_theta)
+    if cfg.model.get("d_summ"):
+        # inelegant solution to registering trace buffers
+        if dataset.name.endswith("-het"):
+            model.load_traces(dataset.F, dataset.R)
+        if dataset.name.startswith("crkp"):
+            model.load_mask(dataset.mask)
+    
     if cfg.log:
         wandb.init(reinit=False)
         logger = WandbLogger(project='crkp')

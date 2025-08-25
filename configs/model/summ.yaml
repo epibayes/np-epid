@@ -1,0 +1,4 @@
+_target_: src.model.SummaryGDN
+d_model: 32
+mean_field: False
+d_summ: 8

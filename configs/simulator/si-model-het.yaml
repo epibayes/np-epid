@@ -8,5 +8,6 @@ heterogeneous: True
 observed_seed: 31
 N: 300
 gamma: 0.05
-log_scale: False
+log_scale: True
 name: si-model-het
+summarize: False # True # False

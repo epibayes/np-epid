@@ -100,7 +100,10 @@ def save_results(posterior_params, val_losses, cfg, name):
     # well this is irritating
     for key in PROBLEM_KEYS:
         if key in results:
-            results[key] = OmegaConf.to_object(results[key])
+            try:
+                results[key] = OmegaConf.to_object(results[key])
+            except ValueError:
+                pass
     # should probably save seed, etc.
     with open("results.yaml", "w", encoding="utf-8") as yaml_file:
         yaml.dump(results, yaml_file)

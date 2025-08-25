@@ -156,7 +156,7 @@ class CRKPTransmissionSimulator(Simulator):
             total_count = np.nansum(X, axis=0)
 
             floor_counts = []
-            for i in [1,2,3,4,6]:
+            for i in range(1,6):
                 # does this work with matrix indexing?
                 floor_count = np.nansum(X * (self.F == i), axis=0)
                 floor_counts.append(floor_count)

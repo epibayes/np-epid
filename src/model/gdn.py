@@ -1,6 +1,6 @@
 import lightning as L
 import torch
-from torch.nn import Linear, ReLU
+from torch.nn import Linear, ReLU, Embedding
 from torch.distributions.normal import Normal
 from torch.distributions.multivariate_normal import MultivariateNormal
 
@@ -93,24 +93,12 @@ class GaussianDensityNetworkBase(L.LightningModule):
 
 class GaussianDensityNetwork(GaussianDensityNetworkBase):
     def __init__(self, d_x, d_theta, d_model, lr, weight_decay,
-                 mean_field, d_summ, mask):
+                 mean_field, first_dim=None):
         super().__init__(d_theta, lr, weight_decay,
                  mean_field)
-        self.d_summ = d_summ
 
-        if self.d_summ:
-            self.embed = torch.nn.Sequential(
-                Linear(1, d_summ),
-                ReLU(),
-                Linear(d_summ, d_summ*2),
-                ReLU(),
-                Linear(d_summ*2, d_summ)
-            )
-            
-            first_dim = d_x * d_summ
-        else:
-            first_dim = d_x
-        # TODO: fix input dim
+        
+        if first_dim is None: first_dim = d_x
 
         self.ff = torch.nn.Sequential(
             Linear(first_dim , d_model),
@@ -126,19 +114,74 @@ class GaussianDensityNetwork(GaussianDensityNetworkBase):
         self.wd = weight_decay
         self.mean_field = mean_field
         self.val_losses = []
-        self.register_buffer("mask", torch.tensor(mask, device=self.device))
+
         
     def encoder(self, x):
-        # TODO: make sure this can handle pre-summarized data
-        if self.d_summ:
-            x = torch.nan_to_num(x)
-            x = self.embed(x.unsqueeze(-1))
-            # need to mask!
+        return self.ff(x)
+    
+class SummaryGDN(GaussianDensityNetwork):
+    def __init__(self, d_x, d_theta, d_model, lr, weight_decay,
+                 mean_field, d_summ):
+        
+        first_dim = d_x * d_summ
+        super().__init__(d_x, d_theta, d_model, lr, weight_decay, mean_field,
+                         first_dim)
+        
+        self.summarize = torch.nn.Sequential(
+                Linear(1, d_summ),
+                ReLU(),
+                Linear(d_summ, d_summ*2),
+                ReLU(),
+                Linear(d_summ*2, d_summ)
+            )
+        
+        self.register_buffer("floor_trace", None)
+        self.register_buffer("room_trace", None)
+        self.register_buffer("mask", None)
+        # self.floor_trace = None
+        # self.room_trace = None
+        # self.mask = None
+        self.d_summ = d_summ
+        
+        
+    def load_traces(self, floor_trace, room_trace):
+        self.register_buffer("floor_trace", torch.tensor(floor_trace, device=self.device))
+        self.register_buffer("room_trace", torch.tensor(room_trace, device=self.device))
+        
+        # create embedding layers
+        self.floor_embedding = Embedding(self.floor_trace.max() + 1, 3)
+        self.room_embedding = Embedding(self.room_trace.max() + 1, 8) 
+        
+        self.summarize = torch.nn.Sequential(
+                Linear(12, self.d_summ),
+                ReLU(),
+                Linear(self.d_summ, self.d_summ),
+                ReLU(),
+                Linear(self.d_summ, self.d_summ),
+            )
+    
+
+    def load_mask(self, mask):
+        self.register_buffer("mask", torch.tensor(mask, device=self.device))
+            
+    
+    def encoder(self, x):
+        x = torch.nan_to_num(x).unsqueeze(-1)
+        # new idea: torch.where(self.floor_trace = f, x, 0)
+        if (self.floor_trace is not None and self.room_trace is not None):
+            m = x.shape[0]
+            f = self.floor_embedding(self.floor_trace).expand(m, -1, -1, -1)
+            r = self.room_embedding(self.room_trace).expand(m, -1, -1, -1)
+            x = torch.cat([x, f, r], -1)
+        
+        x = self.summarize(x)
+        if self.mask is not None:
             w = self.mask.unsqueeze(-1)
             x = x * w
-            # pool over observations
-            x = x.sum(1)
-            x = x.flatten(1, 2)
+        # pool over observations
+        # x = x.sum(1)
+        x = x.mean(1) # mean pooling helps prevent exploding gradient
+        x = x.flatten(1, 2)
         return self.ff(x)
 
 class GaussianDensityRNN(GaussianDensityNetworkBase):

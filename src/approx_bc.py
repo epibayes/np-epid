@@ -5,7 +5,7 @@ from timeit import default_timer as timer
 
 
 def abc_rejection_sampler(S, epsilon, prior_sampler, simulator, 
-                          x_o, max_attempts=10000, summarize=False,
+                          x_o, max_attempts=10000,
                           print_every=5000, error_scaling = None):
     # S: total number of particles
     samples = []
@@ -18,7 +18,7 @@ def abc_rejection_sampler(S, epsilon, prior_sampler, simulator,
         while not accept:
             theta = np.array(prior_sampler())[0]
             x = simulator(theta, seed=attempts)
-            accept, error = accept_sample(x, x_o, epsilon, summarize, error_scaling)
+            accept, error = accept_sample(x, x_o, epsilon, error_scaling)
             if accept:
                 samples.append(theta)
             errors[attempts] = error
@@ -38,8 +38,7 @@ def abc_rejection_sampler(S, epsilon, prior_sampler, simulator,
 
 
 def abc_rejection_sampler2(S, prior_sampler, simulator, 
-                          x_o, summarize=False,
-                          error_scaling = None):
+                          x_o, error_scaling = None):
         # S: total number of particles
     samples = np.empty(S)
     # x_o is shape (d_theta, d_x)
@@ -50,16 +49,14 @@ def abc_rejection_sampler2(S, prior_sampler, simulator,
         theta = np.array(prior_sampler())[0]
         x = simulator(theta, seed=seed)
         # this is gimmicky
-        _, error = accept_sample(x, x_o, 1e5, summarize, error_scaling)
+        _, error = accept_sample(x, x_o, 1e5, error_scaling)
         samples[s] = theta
         errors[s] = error
         seed += 1
     return samples, errors
     
 
-def accept_sample(x, x_o, epsilon, summarize, lam):
-    if summarize:
-        x_o = x_o[0]
+def accept_sample(x, x_o, epsilon, lam):
     v = np.array(x - x_o)
     if lam is not None:
         v = v * lam.reshape(-1, 1)

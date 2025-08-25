@@ -7,7 +7,7 @@ prior_sigma: 1
 N: 100 # num patients
 T: 52 # num timesteps
 log_scale: True
-summarize: False
+summarize: True
 observed_seed: 29
 heterogeneous: False
 pi:

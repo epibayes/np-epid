@@ -39,11 +39,18 @@ class SIModel(Simulator):
         self.set_prior(prior_mu, prior_sigma)
         self.flatten = flatten
         if summarize: 
-            self.d_x = self.d_theta
+            self.d_x = T * self.d_theta # gets flattened
         else:
-            self.d_x = T * self.d_theta
+            self.d_x = T # trailing dimension of a NxT matrix
         self.summarize = summarize
         self.n_sample = n_sample
+        self.F = np.repeat(
+            (np.arange(self.N) % 5)[:, np.newaxis], T, 1
+        )
+        self.R = np.repeat(
+            (np.arange(self.N) % (self.N // 2))[:, np.newaxis], T, 1
+        )
+            
         if n_sample is not None:
             self.data, self.theta = self.simulate_data()
         self.obs = observed_seed
@@ -61,13 +68,17 @@ class SIModel(Simulator):
         thetas = self.sample_logbeta(self.n_sample, seed=5)
         if not self.log_scale:
             thetas = np.exp(thetas)
-        xs = torch.empty((self.n_sample, self.d_x))
+        if self.summarize:
+            xs = torch.empty((self.n_sample, self.d_x))
+        else:
+            xs = torch.empty(self.n_sample, self.N, self.T)
         for i in range(self.n_sample):
             random_seed = 5 * i
-            xs[i] = self.SI_simulator(
+            sim = self.SI_simulator(
                 np.array(thetas[i]),
-                random_seed,
-            ).flatten()
+                random_seed, self.summarize
+            )
+            xs[i] = sim.flatten() if self.summarize else sim 
 
         return xs, thetas.float()
     
@@ -79,15 +90,13 @@ class SIModel(Simulator):
         if self.log_scale:
             theta_true = np.log(theta_true)
         x_o = self.SI_simulator(theta_true, observed_seed)
-        if self.summarize:
-            x_o = x_o.unsqueeze(0)
         if not self.het:
             x_o = x_o.unsqueeze(0)
         if self.flatten and self.het:
             x_o = x_o.unsqueeze(0)
         return x_o.float()
 
-    def SI_simulator(self, theta, seed=None):
+    def SI_simulator(self, theta, seed=None, summarize=False):
         if self.log_scale:
             beta = np.exp(theta)
         else:
@@ -101,9 +110,9 @@ class SIModel(Simulator):
             np.random.seed(seed)
         X  = np.empty((self.N, self.T))
         Y = np.empty((self.N, self.T))
-        # assign zones at random
-        F = np.arange(self.N) % 5 # does this need to be random?
-        R = np.arange(self.N) % (self.N // 2) # N should be divisible by 10
+        # assign zones
+        F = self.F.T[0] # np.arange(self.N) % 5
+        R = self.R.T[0] # np.arange(self.N) % (self.N // 2) # N should be divisible by 10
         # seed initial infections
         X[:, 0] = np.random.binomial(1, self.alpha, self.N)
         Y[:, 0] = X[:, 0]
@@ -146,21 +155,20 @@ class SIModel(Simulator):
 
         Y = torch.tensor(Y).float() # make it all float for good measure
         # is it as simple as offsetting by first element of A?
-        w = None if self.summarize else 0
-        total_count = Y.mean(w)
-        if self.het:
-            floor_counts = [Y[F == i].mean(w) for i in range(5)]
-            if self.summarize:
-                room_count = room_count.mean()
+        if self.summarize:
+            total_count = Y.mean(0)
+            floor_counts = [Y[F == i].mean(0) for i in range(5)]
             room_count = room_count / self.N
-            data =  torch.stack([total_count] + floor_counts + [torch.tensor(room_count)])
+            if self.het:
+                data = torch.stack([total_count] + floor_counts + [torch.tensor(room_count)])
+            else:
+                data = total_count
+            if self.flatten:
+                return data.flatten()
+            else:
+                return data
         else:
-            data = total_count
-            
-        if self.flatten:
-            data = data.flatten()
-        
-        return data
+            return Y
 
     
     def sample_logbeta(self, N, seed=None):

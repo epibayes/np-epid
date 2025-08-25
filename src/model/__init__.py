@@ -1,2 +1,2 @@
-from .gdn import GaussianDensityNetwork
+from .gdn import GaussianDensityNetwork, SummaryGDN
 from .flow import RealNVP
