@@ -26,7 +26,8 @@ def main(cfg):
         # if the data is already summarized, don't fit a summary network
         assert cfg.model.get("d_summ") is None
         
-    model = instantiate(cfg.model, d_x=dataset.d_x, d_theta=dataset.d_theta)
+    model = instantiate(cfg.model, d_x=dataset.d_x, d_theta=dataset.d_theta,
+                        _convert_ = "all")
     if cfg.model.get("d_summ"):
         # inelegant solution to registering trace buffers
         if dataset.name.endswith("-het"):
