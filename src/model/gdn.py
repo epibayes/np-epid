@@ -171,6 +171,7 @@ class SummaryGDN(GaussianDensityNetwork):
         if (self.floor_trace is not None and self.room_trace is not None):
             m = x.shape[0]
             f = self.floor_embedding(self.floor_trace).expand(m, -1, -1, -1)
+            x = torch.cat([x, f], -1)
             r = self.room_embedding(self.room_trace).expand(m, -1, -1, -1)
             x = torch.cat([x, f, r], -1)
         
@@ -220,8 +221,9 @@ class GaussianDensityTransformer(GaussianDensityNetworkBase):
             dim_feedforward=d_model*4 # it's a heuristic idk
         )
         norm = torch.nn.LayerNorm(d_model)
-        assert type(d_x) == torch.Size
-        self.embed = Linear(d_x[1], d_model)
+        assert len(d_x) == 2
+        self.d_x = d_x
+        self.embed = Linear(d_x[0], d_model)
         self.transformer = torch.nn.TransformerEncoder(encoder_layer, n_blocks, norm)
         self.to_output = torch.nn.Sequential(
             ReLU(),
@@ -229,6 +231,7 @@ class GaussianDensityTransformer(GaussianDensityNetworkBase):
         )
         
     def encoder(self, x):
+        x = x.unflatten(-1, self.d_x).transpose(1, 2)
         x = self.embed(x)
         x = self.pos_encode(x)
         y = self.transformer(x)

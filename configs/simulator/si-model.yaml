@@ -13,3 +13,4 @@ heterogeneous: False
 pi:
 eta:
 name: si-model
+transformer: False

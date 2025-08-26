@@ -9,7 +9,8 @@ class SIModel(Simulator):
     def __init__(self, alpha, gamma, beta_true, heterogeneous,
                  prior_mu, prior_sigma,  N, T, name=None, summarize=False,
                  observed_seed=None, room=False, log_scale=True,
-                 n_sample=None, flatten=True, pi=None, eta = None):
+                 n_sample=None, flatten=True, pi=None, eta = None,
+                 transformer=False):
         self.log_scale = log_scale
         self.alpha = alpha # baseline proportion infected in pop
         self.gamma = gamma # discharge rate
@@ -38,8 +39,11 @@ class SIModel(Simulator):
         assert self.d_theta == len(self.beta_true)
         self.set_prior(prior_mu, prior_sigma)
         self.flatten = flatten
-        if summarize: 
-            self.d_x = T * self.d_theta # gets flattened
+        if summarize:
+            if transformer:
+                self.d_x = (self.d_theta, T)
+            else:
+                self.d_x = T * self.d_theta # gets flattened
         else:
             self.d_x = T # trailing dimension of a NxT matrix
         self.summarize = summarize
@@ -68,18 +72,21 @@ class SIModel(Simulator):
         thetas = self.sample_logbeta(self.n_sample, seed=5)
         if not self.log_scale:
             thetas = np.exp(thetas)
-        if self.summarize:
-            xs = torch.empty((self.n_sample, self.d_x))
-        else:
-            xs = torch.empty(self.n_sample, self.N, self.T)
+        # if self.summarize:
+        #     xs = torch.empty((self.n_sample, self.d_x))
+        # else:
+        #     xs = torch.empty(self.n_sample, self.N, self.T)
+        xs = []
         for i in range(self.n_sample):
             random_seed = 5 * i
             sim = self.SI_simulator(
                 np.array(thetas[i]),
                 random_seed, self.summarize
             )
-            xs[i] = sim.flatten() if self.summarize else sim 
-
+            if self.summarize: sim = sim.flatten()
+            xs.append(sim)
+             
+        xs = torch.stack(xs).float()
         return xs, thetas.float()
     
     def get_observed_data(self, observed_seed=None):

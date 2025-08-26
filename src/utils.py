@@ -171,10 +171,11 @@ def nll(beta, alpha, gamma, N, T, X, het):
     # beta = beta / np.array([1, 300, 300, 300, 300, 300, 300])
     return - x_loglikelihood(beta, alpha, gamma, N, T, X, het)
 
-def x_loglikelihood(beta, alpha, gamma, N, T, X, het=False):
+def x_loglikelihood(logbeta, alpha, gamma, N, T, X, het=False):
     ans = np.log(
         alpha ** X[:, 0] * (1 - alpha) ** (1 - X[:, 0])
         ).sum()
+    beta = np.exp(logbeta)
     if not het:
         beta = [beta]
     F = np.arange(N) % 5
