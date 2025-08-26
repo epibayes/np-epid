@@ -49,9 +49,10 @@ class CRKPTransmissionSimulator(Simulator):
 
     def set_prior(self, mu, sigma):
         if self.het:
-            # assert len(mu) == self.d_theta
-            # assert len(sigma) == self.d_theta
-            self.prior_mu = torch.full((7,), mu).float()
+            if type(mu) == list:
+                self.prior_mu = torch.tensor(mu).float()
+            else:
+                self.prior_mu = torch.full((7,), mu).float()
             self.prior_sigma = torch.diag(torch.full((7,), sigma)).float()
         else:
             self.prior_mu = mu

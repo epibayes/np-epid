@@ -13,7 +13,7 @@ TOY_EXPERIMENTS = ("normal-normal", "bayes-linreg")
 @hydra.main(config_path="configs", config_name="config.yaml", version_base=None)
 def main(cfg):
     gpu = device(cfg.gpu_device)
-    dataset = instantiate(cfg.simulator)
+    dataset = instantiate(cfg.simulator, _convert_ = "all")
     observed_data = dataset.get_observed_data()
     if cfg.train.batch_size is None:
         batch_size = cfg.simulator.n_sample
