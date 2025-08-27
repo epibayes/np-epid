@@ -4,13 +4,14 @@ from numpy.random import binomial
 from .simulator import Simulator
 from torch.distributions import MultivariateNormal
 from ..utils import contact_matrix
+from hydra.utils import get_original_cwd
 
 class SIModel(Simulator):
     def __init__(self, alpha, gamma, beta_true, heterogeneous,
                  prior_mu, prior_sigma,  N, T, name=None, summarize=False,
                  observed_seed=None, room=False, log_scale=True,
                  n_sample=None, flatten=True, pi=None, eta = None,
-                 transformer=False):
+                 transformer=False, load_data=False):
         self.log_scale = log_scale
         self.alpha = alpha # baseline proportion infected in pop
         self.gamma = gamma # discharge rate
@@ -54,9 +55,27 @@ class SIModel(Simulator):
         self.R = np.repeat(
             (np.arange(self.N) % (self.N // 2))[:, np.newaxis], T, 1
         )
-            
-        if n_sample is not None:
-            self.data, self.theta = self.simulate_data()
+        if n_sample:
+            prefix = get_original_cwd()
+            f1 = "-het" if heterogeneous else ""
+            f2 = "ls" if log_scale else "ns" 
+            simulate = True
+            if load_data:
+                try:
+                    print("Loading training data...")
+                    self.data = torch.load(f"{prefix}/sim_data/si-model{f1}_{n_sample}_{f2}.pt",
+                                           weights_only=True)
+                    self.theta = torch.load(f"{prefix}/sim_data/si_model{f1}_{n_sample}_{f2}.pt",
+                                            weights_only=True)
+                    simulate = False
+                except FileNotFoundError:
+                    print("Saved training data not found!")
+            if simulate:
+                print("Simulating training data...")
+                self.data, self.theta = self.simulate_data()
+                print("Writing out simulated data...")
+                torch.save(self.data, f"{prefix}/sim_data/si-model{f1}_{n_sample}_{f2}.pt")
+                torch.save(self.theta, f"{prefix}/sim_data/si_model{f1}_{n_sample}_{f2}.pt")
         self.obs = observed_seed
         self.name = name
 
@@ -65,7 +84,10 @@ class SIModel(Simulator):
             self.prior_mu = mu
             self.prior_sigma = sigma
         else:
-            self.prior_mu = torch.full((7,), mu).float()
+            if type(mu) == list:
+                self.prior_mu = torch.tensor(mu).float()
+            else:
+                self.prior_mu = torch.full((7,), mu).float()
             self.prior_sigma = torch.diag(torch.full((7,), sigma)).float()
 
     def simulate_data(self):

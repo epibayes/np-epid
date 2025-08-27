@@ -12,3 +12,4 @@ log_scale: True
 name: si-model-het
 summarize: True
 transformer: False
+load_data: True
