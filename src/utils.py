@@ -7,8 +7,8 @@ import pandas as pd
 import glob
 from sklearn.datasets import make_moons
 from omegaconf import OmegaConf
+from omegaconf.listconfig import ListConfig
 
-PROBLEM_KEYS = ["beta_true"]
 
 class DataModule(L.LightningDataModule):
     def __init__(self, dataset, seed, batch_size, train_frac):
@@ -97,14 +97,9 @@ def save_results(posterior_params, val_losses, cfg, name):
         results[key] = cfg["simulator"][key]
     for key in cfg["model"]:
         results[key] = cfg["model"][key]
-    # well this is irritating
-    for key in PROBLEM_KEYS:
-        if key in results:
-            try:
-                results[key] = OmegaConf.to_object(results[key])
-            except ValueError:
-                pass
-    # should probably save seed, etc.
+    for key in results:
+        if type(results[key]) == ListConfig:
+            results[key] = OmegaConf.to_object(results[key])
     with open("results.yaml", "w", encoding="utf-8") as yaml_file:
         yaml.dump(results, yaml_file)
         
