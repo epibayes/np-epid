@@ -8,6 +8,7 @@ def abc_rejection_sampler(S, epsilon, prior_sampler, simulator,
                           x_o, max_attempts=10000,
                           print_every=5000, error_scaling = None):
     # S: total number of particles
+    accepted_samples = []
     samples = []
     attempts = 0
     # x_o is shape (d_theta, d_x)
@@ -20,12 +21,13 @@ def abc_rejection_sampler(S, epsilon, prior_sampler, simulator,
             x = simulator(theta, seed=attempts)
             accept, error = accept_sample(x, x_o, epsilon, error_scaling)
             if accept:
-                samples.append(theta)
+                accepted_samples.append(theta)
+            samples.append(theta)
             errors[attempts] = error
             attempts += 1
             if attempts == max_attempts:
                 print("Maximum attempts reached, halting")
-                return np.array(samples), errors
+                return np.array(accepted_samples), errors, np.stack(samples)
             if not attempts % print_every:
                 print(f"Attempts: {attempts:,}")
     end_time = timer()
@@ -34,7 +36,7 @@ def abc_rejection_sampler(S, epsilon, prior_sampler, simulator,
     print(f"Time lapsed: {end_time - start_time:.2f} seconds")
     print(f"With tolerance {epsilon}, acceptance rate: {accept_rate:.6f}")
     print(f"Total number of attempts: {attempts:,}")
-    return np.array(samples), errors
+    return np.array(accepted_samples), errors, np.stack(samples)
 
 
 def abc_rejection_sampler2(S, prior_sampler, simulator, 

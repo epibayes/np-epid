@@ -8,3 +8,4 @@ flatten: True
 name: "crkp-het"
 summarize: True
 transformer: False
+postfix: "c"

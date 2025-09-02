@@ -8,3 +8,5 @@ pi:
 name: "crkp"
 summarize: False
 transformer: False
+load_data: True
+postfix: "a"

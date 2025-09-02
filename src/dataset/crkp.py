@@ -12,7 +12,7 @@ class CRKPTransmissionSimulator(Simulator):
                  heterogeneous=True, name=None,
                  flatten=False, N=None,
                  summarize=False, pi=None, return_case_count=False,
-                 transformer=False):
+                 transformer=False, load_data=False, postfix=""):
         self.n_sample = n_sample
         self.het = heterogeneous
         self.cap = np.array(SCALE)
@@ -42,13 +42,28 @@ class CRKPTransmissionSimulator(Simulator):
             self.d_x = self.T
         self.flatten = flatten # set false for ABC
         self.return_case_count = return_case_count
-        if n_sample is not None:
-            self.data, self.theta = self.simulate_data(summarize)
+        if n_sample:
+            simulate = True
+            if load_data:
+                try:
+                    print("Loading training data...")
+                    self.data = torch.load(f"{path}/data_{n_sample}_{postfix}.pt",
+                                           weights_only=True)
+                    self.theta = torch.load(f"{path}/theta_{n_sample}_{postfix}.pt",
+                                            weights_only=True)
+                    simulate = False
+                except FileNotFoundError:
+                    print("Saved training data not found!")
+            if simulate:
+                print("Simulating training data...")
+                self.data, self.theta = self.simulate_data(summarize)
+                print("Writing out simulated data...")
+                torch.save(self.data, f"{path}/data_{n_sample}_{postfix}.pt")
+                torch.save(self.theta, f"{path}/theta_{n_sample}_{postfix}.pt")
 
         self.x_o = self.load_observed_data(path, summarize)
         self.name = name
         self.mask = self.W
-        self.summarize=summarize
         
 
     def set_prior(self, mu, sigma):

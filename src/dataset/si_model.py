@@ -63,9 +63,9 @@ class SIModel(Simulator):
             if load_data:
                 try:
                     print("Loading training data...")
-                    self.data = torch.load(f"{prefix}/sim_data/si-model{f1}_{n_sample}_{f2}.pt",
+                    self.data = torch.load(f"{prefix}/sim_data/si-model_data_{f1}_{n_sample}_{f2}.pt",
                                            weights_only=True)
-                    self.theta = torch.load(f"{prefix}/sim_data/si_model{f1}_{n_sample}_{f2}.pt",
+                    self.theta = torch.load(f"{prefix}/sim_data/si_model_theta_{f1}_{n_sample}_{f2}.pt",
                                             weights_only=True)
                     simulate = False
                 except FileNotFoundError:
@@ -74,8 +74,8 @@ class SIModel(Simulator):
                 print("Simulating training data...")
                 self.data, self.theta = self.simulate_data()
                 print("Writing out simulated data...")
-                torch.save(self.data, f"{prefix}/sim_data/si-model{f1}_{n_sample}_{f2}.pt")
-                torch.save(self.theta, f"{prefix}/sim_data/si_model{f1}_{n_sample}_{f2}.pt")
+                torch.save(self.data, f"{prefix}/sim_data/si-model_data_{f1}_{n_sample}_{f2}.pt")
+                torch.save(self.theta, f"{prefix}/sim_data/si_model_theta_{f1}_{n_sample}_{f2}.pt")
         self.obs = observed_seed
         self.name = name
 
