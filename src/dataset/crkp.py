@@ -64,6 +64,7 @@ class CRKPTransmissionSimulator(Simulator):
         self.x_o = self.load_observed_data(path, summarize)
         self.name = name
         self.mask = self.W
+        self.summarize = summarize
         
 
     def set_prior(self, mu, sigma):
