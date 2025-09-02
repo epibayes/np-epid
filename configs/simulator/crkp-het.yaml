@@ -2,8 +2,9 @@ defaults:
   - crkp
 
 heterogeneous: True
-prior_mu: [-3,-4,-4,-4,-4,-4,-4] # -3
+prior_mu: [-3,-4,-4,-4,-4,-4,-5] # -3
 prior_sigma: 1
 flatten: True
 name: "crkp-het"
 summarize: True
+transformer: False

@@ -11,7 +11,8 @@ class CRKPTransmissionSimulator(Simulator):
     def __init__(self, path, prior_mu, prior_sigma, n_sample=None,
                  heterogeneous=True, name=None,
                  flatten=False, N=None,
-                 summarize=False, pi=None, return_case_count=False):
+                 summarize=False, pi=None, return_case_count=False,
+                 transformer=False):
         self.n_sample = n_sample
         self.het = heterogeneous
         self.cap = np.array(SCALE)
@@ -33,7 +34,10 @@ class CRKPTransmissionSimulator(Simulator):
         else:
             self.pi = None
         if summarize:
-            self.d_x = self.T * self.d_theta
+            if transformer:
+                self.d_x = (self.d_theta, self.T)
+            else:
+                self.d_x = self.T * self.d_theta
         else:
             self.d_x = self.T
         self.flatten = flatten # set false for ABC
@@ -81,18 +85,21 @@ class CRKPTransmissionSimulator(Simulator):
         return obs.float()
     
     def simulate_data(self, summarize=False):
-        logbetas = self.sample_logbeta(self.n_sample, seed=5)
-        if summarize:
-            xs = torch.empty(self.n_sample, self.d_x)
-        else:
-            xs = torch.empty(self.n_sample, self.N, self.T)
+        logbetas = self.sample_logbeta(self.n_sample, seed=6)
+        # if summarize:
+        #     xs = torch.empty(self.n_sample, self.d_x)
+        # else:
+        #     xs = torch.empty(self.n_sample, self.N, self.T)
+        xs = []
         for i in range(self.n_sample):
             rs = 5 * i
             sim = self.CRKP_simulator(
                 np.array(logbetas[i]), rs, summarize=summarize
                 )
-            xs[i] = sim.flatten() if summarize else sim
-
+            if summarize: sim = sim.flatten()
+            xs.append(sim)
+            # xs[i] = sim.flatten() if summarize else sim
+        xs = torch.stack(xs).float()
 
         return xs, logbetas.float()
     
