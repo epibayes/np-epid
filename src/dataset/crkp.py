@@ -190,14 +190,14 @@ class CRKPTransmissionSimulator(Simulator):
             # need to tweak this
             if not (self.het or show_full): data = data[0]
             
-            return data
+            if self.return_case_count:
+                case_count = (X == 1).any(1).sum()
+                return data, case_count
+            else:
+                return data
         
         else:
             return torch.tensor(X)
-
-        # if self.return_case_count:
-        #     case_count = (X == 1).any(1).sum()
-        #     return data, case_count
 
 
     def sample_logbeta(self, N, seed=None):
