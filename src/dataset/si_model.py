@@ -94,10 +94,7 @@ class SIModel(Simulator):
         thetas = self.sample_logbeta(self.n_sample, seed=5)
         if not self.log_scale:
             thetas = np.exp(thetas)
-        # if self.summarize:
-        #     xs = torch.empty((self.n_sample, self.d_x))
-        # else:
-        #     xs = torch.empty(self.n_sample, self.N, self.T)
+
         xs = []
         for i in range(self.n_sample):
             random_seed = 5 * i
@@ -125,7 +122,7 @@ class SIModel(Simulator):
             x_o = x_o.unsqueeze(0)
         return x_o.float()
 
-    def SI_simulator(self, theta, seed=None, summarize=False):
+    def SI_simulator(self, theta, seed=None):
         if self.log_scale:
             beta = np.exp(theta)
         else:
