@@ -2,7 +2,7 @@
 
 [![arXiv](https://img.shields.io/badge/arXiv-<2412.12967>-<COLOR>.svg)](https://arxiv.org/abs/2412.12967)
 
-Code for calibrating stochastic infectious disease models to data through simulation-based inference and deep learning.
+Code for *Neural Posterior Estimation for Stochastic Epidemic Modeling*, accepted for publication in the _Annals of Applied Statistics_ in 2026.
 
 ### How to Use
 
